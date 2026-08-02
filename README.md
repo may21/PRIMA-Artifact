@@ -53,8 +53,8 @@ Manager -> Predictor -> Calculator -> Workload Launcher -> Metrics Collector
 Clone the repository on the edge node:
 
 ```bash
-git clone https://github.com/woosy123/prima.git
-cd prima
+git clone https://github.com/woosy123/PRIMA.git
+cd PRIMA
 python3 -m pip install -r requirements.txt
 ```
 
