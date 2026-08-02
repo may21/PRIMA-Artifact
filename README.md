@@ -213,3 +213,55 @@ For goodput, CLS uses 5,000 ImageNet images. DET/EST/SEG use the same 5,000
 COCO images. OBB uses the available DOTA val/test images as-is; if fewer than
 5,000 DOTA images are present, the runner reuses the image list until it records
 5,000 requests.
+
+## 7. ETRI workload note
+
+The ETRI workload was prepared on a separate Jetson Orin Nano edge node
+(`orin-test`). That node is currently not connected; the workload is stored on
+its SSD, and the USB device provided by ETRI must also be connected when using
+this workload.
+
+Workload directory on `orin-test`:
+
+```text
+/home/orin-test/etri2
+```
+
+Recorded directory contents:
+
+```text
+172.17.11.121.mp4
+172.17.11.122.mp4
+test_deepDet_lib_console_lprDet
+test_deepDet_lib_console_speedDet
+```
+
+The workload used the JetPack-matched NVIDIA L4T image:
+
+```text
+nvcr.io/nvidia/l4t-jetpack:r36.4.0
+image id: 51f1e16a5dd9
+size: 9.83 GB
+```
+
+Container creation used the NVIDIA runtime option:
+
+```bash
+docker run -it --runtime=nvidia -v ~/etri2:/home 51f /bin/bash
+```
+
+Recorded container:
+
+```text
+container id: f7e3e981d06c
+image: 51f
+command: /bin/bash
+name: kind_faraday
+```
+
+Restart and attach:
+
+```bash
+docker start f7e
+docker attach f7e
+```
