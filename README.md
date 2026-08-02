@@ -290,8 +290,8 @@ Boot-time command sequence on the Jetson board:
 
 ```bash
 mount /dev/sda1 ~/etri
-docker start c6c
-docker attach c6c
+docker start f7e
+docker attach f7e
 cd /home
 cd test_deepDet_lib_console_lprDet
 ./etriDeepDet
