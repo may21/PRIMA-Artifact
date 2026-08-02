@@ -1,0 +1,32 @@
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+
+# Local experiment outputs
+results/*
+outputs/
+logs/
+*.log
+
+# Large datasets and generated model artifacts
+datasets/
+data/
+cache/
+models/
+*.engine
+*.pt
+*.onnx
+
+!prima/predictor/rf_model.pkl
+
+# Small feature datasets used by the reproduction scripts.
+!datasets/
+!datasets/*.csv
+!datasets/README.md
+
+# OS/editor
+.DS_Store
+.idea/
+.vscode/

@@ -1,0 +1,7 @@
+device: jetson_orin_nano
+power_mode: 15w
+memory_gb: 8
+jetpack: "6.2"
+cuda: "12.6"
+tensorrt: "10.3.0"
+

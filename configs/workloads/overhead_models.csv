@@ -1,0 +1,6 @@
+workload,onnx_path
+CLS,/home/orin1/prima_artifacts/onnx_cache/yolov8n-cls.onnx
+DET,/home/orin1/prima_artifacts/onnx_cache/yolov8n.onnx
+EST,/home/orin1/prima_artifacts/onnx_cache/yolov8n-pose.onnx
+SEG,/home/orin1/prima_artifacts/onnx_cache/yolov8n-seg.onnx
+OBB,/home/orin1/prima_artifacts/onnx_cache/yolov8n-obb.onnx

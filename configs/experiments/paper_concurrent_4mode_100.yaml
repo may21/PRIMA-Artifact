@@ -1,0 +1,15 @@
+name: paper_concurrent_4mode_100
+num_images: 100
+repeats: 3
+modes:
+  - ts_unlimited
+  - mps20_unlimited
+  - ts_memlimit
+  - mps20_memlimit
+memory_budgets:
+  classify: 821m
+  detect: 1071m
+  pose: 1068m
+  segment: 1649m
+  obb: 2233m
+

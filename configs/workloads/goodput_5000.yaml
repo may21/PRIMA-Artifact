@@ -1,0 +1,14 @@
+unique_images: 5000
+unique_images_obb: auto
+requests: 5000
+loops: 1
+workloads:
+  - CLS
+  - DET
+  - EST
+  - SEG
+  - OBB
+dataset_policy:
+  github: "do not commit image datasets"
+  orin1_usb_root: "/mnt/prima_usb/prima_goodput_5000"
+  obb: "use all DOTA val/test originals without crop/tile; cycle them to produce 5000 measured OBB requests"

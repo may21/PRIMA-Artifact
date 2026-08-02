@@ -1,0 +1,30 @@
+{
+  "feature_order": [
+    "workload",
+    "model_size",
+    "batch",
+    "H",
+    "W",
+    "precision",
+    "num_inputs",
+    "num_outputs",
+    "total_input_bytes",
+    "total_output_bytes",
+    "weight_bytes",
+    "param_count",
+    "op_Add",
+    "op_Concat",
+    "op_Constant",
+    "op_Conv",
+    "op_GlobalAveragePool",
+    "op_Mul",
+    "op_Reshape",
+    "op_Sigmoid",
+    "op_Split"
+  ],
+  "categorical": [
+    "workload",
+    "model_size",
+    "precision"
+  ]
+}

@@ -1,0 +1,22 @@
+num_images: 100
+batch: 1
+height: 640
+width: 640
+precision: fp32
+workloads:
+  CLS:
+    script: classify.py
+    model: yolov8n-cls
+  DET:
+    script: detect.py
+    model: yolov8n
+  EST:
+    script: pose.py
+    model: yolov8n-pose
+  SEG:
+    script: segment.py
+    model: yolov8n-seg
+  OBB:
+    script: obb.py
+    model: yolov8n-obb
+
