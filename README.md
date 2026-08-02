@@ -192,10 +192,10 @@ Orin1 storage:
 | `/home/orin1/ssd/prima_goodput_5000` | Goodput image datasets prepared outside GitHub |
 | `/mnt/prima_usb/prima_dataset_expansion` | Existing model/profile backup artifacts, not required for goodput dataset preparation |
 
-On the current Orin1 machine, the `prima_artifacts` entries are symbolic links
-to existing storage locations so that large data does not need to be moved.
-Goodput datasets are stored directly on the Orin1 SSD because the attached USB
-device showed very slow write throughput during dataset preparation.
+On the current Orin1 machine, `prima_artifacts` contains real directories for
+the required external assets. Goodput datasets are stored directly on the Orin1
+SSD because the attached USB device showed very slow write throughput during
+dataset preparation.
 
 For the goodput dataset, CLS uses ImageNet images and DET/EST/SEG share COCO
 images. OBB uses DOTA val/test original images without crop, tile, or source
