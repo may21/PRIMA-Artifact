@@ -13,12 +13,12 @@
 | Inference engine | TensorRT v10.3.0 |
 | Container runtime | Docker with NVIDIA runtime |
 
-Caveats:
+Notes:
 
-- The experiment scripts assume the paper power mode, normally 15 W.
-- Swap should be disabled for the reported memory-isolation experiments.
-- Large datasets, TensorRT engines, Docker images, and raw results are not
-  stored in this repository.
+- Set Jetson Orin Nano to 15 W mode before running experiments.
+- Turn off swap for memory-isolation experiments.
+- Keep large files outside GitHub: datasets, TensorRT engines, Docker images,
+  and raw results.
 
 ## 2. Repository layout
 
