@@ -10,5 +10,5 @@ workloads:
   - OBB
 dataset_policy:
   github: "do not commit image datasets"
-  orin1_usb_root: "/mnt/prima_usb/prima_goodput_5000"
+  orin1_ssd_root: "/home/orin1/ssd/prima_goodput_5000"
   obb: "use all DOTA val/test originals without crop/tile; cycle them to produce 5000 measured OBB requests"

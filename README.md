@@ -136,7 +136,7 @@ Prepare these assets on the edge node before running the full artifact:
 |---|---|
 | YOLO workload assets and results | `/home/orin1/prima_artifacts/yolo` |
 | YOLO runtime images and TensorRT engines | `/home/orin1/prima_artifacts/yolo_runtime` |
-| Goodput datasets | `/mnt/prima_usb/prima_goodput_5000` |
+| Goodput datasets | `/home/orin1/ssd/prima_goodput_5000` |
 | Goodput state and results | `/home/orin1/prima_artifacts/goodput` |
 | CLIP model/data cache and results | `/home/orin1/prima_artifacts/clip` |
 | ONNX files for overhead measurement | `/home/orin1/prima_artifacts/onnx_cache` |
@@ -152,14 +152,6 @@ The repository includes only the small predictor feature table:
 
 ```text
 datasets/predictor_memory_features.csv
-```
-
-Optional USB storage for goodput datasets:
-
-```bash
-sudo mkdir -p /mnt/prima_usb
-sudo mount /dev/sda1 /mnt/prima_usb
-sudo chown -R orin1:orin1 /mnt/prima_usb
 ```
 
 ## 6. File locations
@@ -184,7 +176,7 @@ GitHub repository:
 | `scripts/setup/` | Environment and helper scripts |
 | `requirements.txt` | Python dependencies |
 
-Orin1 and USB storage:
+Orin1 storage:
 
 | Path | Contents |
 |---|---|
@@ -197,16 +189,13 @@ Orin1 and USB storage:
 | `/home/orin1/prima_artifacts/goodput/results` | Goodput result directories |
 | `/home/orin1/prima_artifacts/clip` | CLIP model/data cache and result files |
 | `/home/orin1/prima_artifacts/onnx_cache` | ONNX files used by the overhead runner |
-| `/mnt/prima_usb/prima_goodput_5000` | Goodput image datasets prepared outside GitHub |
-| `/home/orin1/ssd/prima_goodput_5000` | Current SSD-backed ImageNet and DOTA goodput images |
+| `/home/orin1/ssd/prima_goodput_5000` | Goodput image datasets prepared outside GitHub |
 | `/mnt/prima_usb/prima_dataset_expansion` | Existing model/profile backup artifacts, not required for goodput dataset preparation |
 
 On the current Orin1 machine, the `prima_artifacts` entries are symbolic links
 to existing storage locations so that large data does not need to be moved.
-The current ImageNet and DOTA goodput folders are stored on the Orin1 SSD and
-bind-mounted into `/mnt/prima_usb/prima_goodput_5000` because the attached USB
-device showed very slow write throughput during dataset preparation. The runner
-paths remain unchanged.
+Goodput datasets are stored directly on the Orin1 SSD because the attached USB
+device showed very slow write throughput during dataset preparation.
 
 For the goodput dataset, CLS uses ImageNet images and DET/EST/SEG share COCO
 images. OBB uses DOTA val/test original images without crop, tile, or source
