@@ -206,12 +206,10 @@ separate locations:
 | `/home/orin1/prima_artifacts/onnx_cache` | ONNX files used by the overhead runner |
 | `/home/orin1/ssd/prima_goodput_5000` | Goodput image datasets prepared outside GitHub |
 
-On the current Orin1 machine, `prima_artifacts` contains real directories for
-the required external assets. Goodput datasets are stored directly on the Orin1
-SSD.
+On Orin1, external assets are already placed under `prima_artifacts`, and
+goodput images are stored under `/home/orin1/ssd/prima_goodput_5000`.
 
-For the goodput dataset, CLS uses ImageNet images and DET/EST/SEG share COCO
-images. OBB uses DOTA val/test original images without crop, tile, or source
-image modification. By default, `UNIQUE_IMAGES_OBB=auto` uses all DOTA images
-present in `expanded_dota_images`; the OBB runner still records 5,000 measured
-requests by cycling through those originals.
+For goodput, CLS uses 5,000 ImageNet images. DET/EST/SEG use the same 5,000
+COCO images. OBB uses the available DOTA val/test images as-is; if fewer than
+5,000 DOTA images are present, the runner reuses the image list until it records
+5,000 requests.
