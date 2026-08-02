@@ -81,15 +81,15 @@ ORIN_HOST=$EDGE_HOST ORIN_PORT=$EDGE_PORT \
 
 Run these wrappers directly on the edge node.
 
-| Experiment | Edge-node command | Runs | Main output metrics |
-|---|---|---|---|
-| Isolated baseline | `./scripts/experiments/run_isolated_baseline.sh` | Each YOLO workload alone, with no Docker memory limit. | Isolated latency, elapsed time, pidstat memory, tegrastats RAM/GPU, and per-workload logs. |
-| Concurrent comparison | `./scripts/experiments/run_concurrent_comparison.sh` | Five YOLO workloads concurrently under TS, MPS, PRIMA-TS, and PRIMA-MPS conditions. | Concurrent latency, total elapsed time, cgroup memory, page faults, CPU/GPU utilization, and comparison CSVs. |
-| Memory sweep | `./scripts/experiments/run_memory_sweep.sh` | Each YOLO workload under isolated Docker memory limits from 0.5 GB to 2.5 GB. | Completion threshold, latency, peak memory, page faults, and GPU utilization by memory budget. |
-| MPS partitioning | `./scripts/experiments/run_mps_partitioning.sh` | MPS 20% and MPS 50% partitioning conditions. | Normalized MPS latency, memory usage, and page-fault behavior. |
-| Goodput latency | `./scripts/experiments/run_goodput_latency.sh` | Five concurrent YOLO goodput workloads, 5,000 requests per workload. | Per-request latency and p50/p90/p99-ready CSV outputs. |
-| CLIP generalization | `./scripts/experiments/run_clip_generalization.sh` | CLIP ViT-B/32 and RN50 Docker profiling. | Peak system RAM, peak container memory, elapsed time, and CLIP summary CSVs. |
-| PRIMA overhead | `./scripts/experiments/run_prima_overhead.sh` | Predictor and Calculator overhead measurement over the ONNX model list. | Feature extraction, RF prediction, and Calculator overhead. |
+| Experiment | Command | Summary |
+|---|---|---|
+| Isolated baseline | `./scripts/experiments/run_isolated_baseline.sh` | Runs each YOLO workload alone and collects latency, elapsed time, pidstat memory, and tegrastats logs. |
+| Concurrent comparison | `./scripts/experiments/run_concurrent_comparison.sh` | Runs five YOLO workloads under TS, MPS, PRIMA-TS, and PRIMA-MPS; collects latency, memory, page faults, CPU/GPU utilization, and comparison CSVs. |
+| Memory sweep | `./scripts/experiments/run_memory_sweep.sh` | Sweeps isolated Docker memory limits from 0.5 GB to 2.5 GB; collects completion threshold, latency, memory, page faults, and GPU utilization. |
+| MPS partitioning | `./scripts/experiments/run_mps_partitioning.sh` | Compares MPS 20% and MPS 50%; collects normalized latency, memory usage, and page-fault behavior. |
+| Goodput latency | `./scripts/experiments/run_goodput_latency.sh` | Runs five concurrent YOLO goodput workloads for 5,000 requests per workload and exports latency summary CSVs. |
+| CLIP generalization | `./scripts/experiments/run_clip_generalization.sh` | Profiles CLIP ViT-B/32 and RN50; collects peak RAM, peak container memory, elapsed time, and CLIP summaries. |
+| PRIMA overhead | `./scripts/experiments/run_prima_overhead.sh` | Measures feature extraction, RF prediction, and Calculator overhead over the ONNX model list. |
 
 From a master node, use the same launcher with a target name:
 
