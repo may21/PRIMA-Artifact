@@ -178,6 +178,21 @@ GitHub repository:
 
 Orin1 storage:
 
+Use the GitHub clone as the working directory:
+
+```bash
+cd /home/orin1/woosy/PRIMA
+```
+
+The current Orin1 layout keeps code, external assets, and goodput datasets in
+separate locations:
+
+```text
+/home/orin1/woosy/PRIMA              GitHub clone and experiment scripts
+/home/orin1/prima_artifacts          External assets used by the scripts
+/home/orin1/ssd/prima_goodput_5000   Goodput image datasets
+```
+
 | Path | Contents |
 |---|---|
 | `/home/orin1/woosy/PRIMA` | GitHub clone used by `scripts/master/run_on_orin1.sh` |
