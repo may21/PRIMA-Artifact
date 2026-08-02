@@ -14,7 +14,7 @@ artifacts. Raw result directories are intentionally excluded from GitHub.
 | MPS partitioning | Normalized inference time, peak memory usage, page-fault rate for 20% and 50% MPS conditions | `scripts/experiments/run_mps_partitioning.sh` | Same organized concurrent files, with `mps20_*` and `mps50_*` modes |
 | Goodput and latency percentiles | Per-request inference latency for 5,000 requests per workload, p50/p90/p99 derivable from raw latency CSVs | `scripts/experiments/run_goodput_latency.sh` | `inference_latency.csv`, `organized/inference_times_raw.csv`, `organized/inference_times_wide.csv`, `organized/run_summary.csv`, `organized/validation.txt` |
 | CLIP generalization | Peak system RAM, peak container memory, elapsed time | `scripts/experiments/run_clip_generalization.sh` | `clip_memory_peak_raw.csv`, `clip_memory_peak_average.csv`, per-run `system_tegrastats.txt`, `docker_stats.txt`, `summary.txt` |
-| PRIMA overhead | Feature extraction, RF prediction, and Calculator elapsed time | `scripts/experiments/run_prima_overhead.sh` | `overhead_raw.csv`, `overhead_summary.csv` |
+| PRIMA overhead | ONNX feature extraction, RF prediction, and Calculator elapsed time | `scripts/experiments/run_prima_overhead.sh` | `overhead_raw.csv`, `overhead_summary.csv` |
 
 Known requirements before a full rerun:
 
@@ -22,4 +22,4 @@ Known requirements before a full rerun:
 - Keep swap disabled for the reported memory-isolation and goodput experiments.
 - Prepare `/home/orin1/ssd/prima_goodput_5000` before running goodput. OBB defaults to `UNIQUE_IMAGES_OBB=auto`, which uses all DOTA val/test originals while still recording 5,000 measured requests.
 - Keep TensorRT engines, image lists, and datasets under `/home/orin1/prima_artifacts`; they are not committed.
-- Keep ONNX files available at the paths in `configs/workloads/overhead_models.csv`, or pass a replacement `MODEL_CSV`.
+- Keep ONNX graph files for Predictor feature extraction available at the paths in `configs/workloads/overhead_models.csv`, or pass a replacement `MODEL_CSV`.
