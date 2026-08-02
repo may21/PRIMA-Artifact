@@ -265,3 +265,39 @@ Restart and attach:
 docker start f7e
 docker attach f7e
 ```
+
+After attaching to the container, the mounted `/home` directory contains the
+ETRI workload files.
+
+Run LPR detection:
+
+```bash
+cd /home
+cd test_deepDet_lib_console_lprDet
+./etriDeepDet
+```
+
+Run speed detection:
+
+```bash
+cd /home
+cd test_deepDet_lib_console_speedDet
+./etriDeepDet
+```
+
+During execution, the program prints recognition results for each frame and
+creates date/time-stamped result directories under `_Result`.
+
+Boot-time command sequence on the Jetson board:
+
+```bash
+mount /dev/sda1 ~/etri
+docker start c6c
+docker attach c6c
+cd /home
+cd test_deepDet_lib_console_lprDet
+./etriDeepDet
+```
+
+Use the container id shown by `docker ps -a` if it differs from the recorded
+`f7e` or `c6c` prefix.
