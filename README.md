@@ -79,51 +79,30 @@ ORIN_HOST=$EDGE_HOST ORIN_PORT=$EDGE_PORT \
 
 ## 4. Experiments
 
-Run the wrappers directly on the edge node:
+Run these wrappers directly on the edge node.
 
-```bash
-./scripts/experiments/run_isolated_baseline.sh
-./scripts/experiments/run_concurrent_comparison.sh
-./scripts/experiments/run_memory_sweep.sh
-./scripts/experiments/run_mps_partitioning.sh
-./scripts/experiments/run_goodput_latency.sh
-./scripts/experiments/run_clip_generalization.sh
-./scripts/experiments/run_prima_overhead.sh
-```
+| Experiment | Edge-node command | Runs | Main output metrics |
+|---|---|---|---|
+| Isolated baseline | `./scripts/experiments/run_isolated_baseline.sh` | Each YOLO workload alone, with no Docker memory limit. | Isolated latency, elapsed time, pidstat memory, tegrastats RAM/GPU, and per-workload logs. |
+| Concurrent comparison | `./scripts/experiments/run_concurrent_comparison.sh` | Five YOLO workloads concurrently under TS, MPS, PRIMA-TS, and PRIMA-MPS conditions. | Concurrent latency, total elapsed time, cgroup memory, page faults, CPU/GPU utilization, and comparison CSVs. |
+| Memory sweep | `./scripts/experiments/run_memory_sweep.sh` | Each YOLO workload under isolated Docker memory limits from 0.5 GB to 2.5 GB. | Completion threshold, latency, peak memory, page faults, and GPU utilization by memory budget. |
+| MPS partitioning | `./scripts/experiments/run_mps_partitioning.sh` | MPS 20% and MPS 50% partitioning conditions. | Normalized MPS latency, memory usage, and page-fault behavior. |
+| Goodput latency | `./scripts/experiments/run_goodput_latency.sh` | Five concurrent YOLO goodput workloads, 5,000 requests per workload. | Per-request latency and p50/p90/p99-ready CSV outputs. |
+| CLIP generalization | `./scripts/experiments/run_clip_generalization.sh` | CLIP ViT-B/32 and RN50 Docker profiling. | Peak system RAM, peak container memory, elapsed time, and CLIP summary CSVs. |
+| PRIMA overhead | `./scripts/experiments/run_prima_overhead.sh` | Predictor and Calculator overhead measurement over the ONNX model list. | Feature extraction, RF prediction, and Calculator overhead. |
 
-| Edge-node command | Runs | Main output metrics |
+The master-node launcher runs the same edge-node wrappers through SSH.
+
+| Target | Master-node command | Purpose |
 |---|---|---|
-| `./scripts/experiments/run_isolated_baseline.sh` | Runs each YOLO workload alone with no Docker memory limit through `scripts/runners/yolo/run_isolated_baseline.sh`. | Isolated inference latency, elapsed time, pidstat memory, tegrastats RAM/GPU, and per-workload result logs. |
-| `./scripts/experiments/run_concurrent_comparison.sh` | Runs five YOLO workloads concurrently through `scripts/runners/yolo/run_concurrent_4mode.sh`. By default it executes TS, MPS 20%, PRIMA-TS, and PRIMA-MPS conditions. | Concurrent inference latency, total elapsed time, cgroup memory, page faults, CPU/GPU utilization, and organized comparison CSVs. |
-| `./scripts/experiments/run_memory_sweep.sh` | Runs each YOLO workload under isolated Docker memory limits from 0.5 GB to 2.5 GB through `scripts/runners/yolo/run_isolated_memory_sweep.sh`. | Completion threshold, latency, peak memory, page faults, and GPU utilization by memory budget. |
-| `./scripts/experiments/run_mps_partitioning.sh` | Runs MPS 20% and MPS 50% partitioning conditions through the YOLO concurrent runners. | Normalized MPS latency, memory usage, and page-fault behavior for partitioning comparison. |
-| `./scripts/experiments/run_goodput_latency.sh` | Runs five concurrent YOLO goodput workloads through `scripts/runners/goodput/run_goodput_concurrent.sh`, then organizes latency CSVs. | Per-request latency for 5,000 requests per workload and p50/p90/p99-ready CSV outputs. |
-| `./scripts/experiments/run_clip_generalization.sh` | Runs CLIP ViT-B/32 and RN50 Docker profiling through `scripts/runners/clip/`. | Peak system RAM, peak container memory, elapsed time, and CLIP summary CSVs. |
-| `./scripts/experiments/run_prima_overhead.sh` | Runs `scripts/runners/overhead/measure_prima_overhead.py` over the ONNX model list. | Feature extraction, RF prediction, and Calculator overhead. |
-
-Or launch the same wrappers from the master node:
-
-```bash
-./scripts/master/run_on_orin1.sh ch3-isolated
-./scripts/master/run_on_orin1.sh ch3-concurrent
-./scripts/master/run_on_orin1.sh ch3-sweep
-./scripts/master/run_on_orin1.sh ch5-concurrent
-./scripts/master/run_on_orin1.sh ch5-mps
-./scripts/master/run_on_orin1.sh ch5-goodput
-./scripts/master/run_on_orin1.sh ch5-clip
-./scripts/master/run_on_orin1.sh ch5-overhead
-```
-
-| Target | Purpose |
-|---|---|
-| `ch3-isolated` | Calls `./scripts/experiments/run_isolated_baseline.sh` on Orin1. |
-| `ch3-concurrent` | Calls `./scripts/experiments/run_concurrent_comparison.sh` with `MODE_LIST="ts_unlimited mps20_unlimited"`. |
-| `ch3-sweep` | Calls `./scripts/experiments/run_memory_sweep.sh` on Orin1. |
-| `ch5-concurrent` | Calls `./scripts/experiments/run_concurrent_comparison.sh` with all default concurrent modes. |
-| `ch5-mps` | Calls `./scripts/experiments/run_mps_partitioning.sh` on Orin1. |
-| `ch5-goodput` | Calls `./scripts/experiments/run_goodput_latency.sh` on Orin1. |
-| `ch5-clip` | Calls `./scripts/experiments/run_clip_generalization.sh` on Orin1. |
-| `ch5-overhead` | Calls `./scripts/experiments/run_prima_overhead.sh` on Orin1. |
+| `ch3-isolated` | `./scripts/master/run_on_orin1.sh ch3-isolated` | Calls `./scripts/experiments/run_isolated_baseline.sh` on Orin1. |
+| `ch3-concurrent` | `./scripts/master/run_on_orin1.sh ch3-concurrent` | Calls `./scripts/experiments/run_concurrent_comparison.sh` with `MODE_LIST="ts_unlimited mps20_unlimited"`. |
+| `ch3-sweep` | `./scripts/master/run_on_orin1.sh ch3-sweep` | Calls `./scripts/experiments/run_memory_sweep.sh` on Orin1. |
+| `ch5-concurrent` | `./scripts/master/run_on_orin1.sh ch5-concurrent` | Calls `./scripts/experiments/run_concurrent_comparison.sh` with all default concurrent modes. |
+| `ch5-mps` | `./scripts/master/run_on_orin1.sh ch5-mps` | Calls `./scripts/experiments/run_mps_partitioning.sh` on Orin1. |
+| `ch5-goodput` | `./scripts/master/run_on_orin1.sh ch5-goodput` | Calls `./scripts/experiments/run_goodput_latency.sh` on Orin1. |
+| `ch5-clip` | `./scripts/master/run_on_orin1.sh ch5-clip` | Calls `./scripts/experiments/run_clip_generalization.sh` on Orin1. |
+| `ch5-overhead` | `./scripts/master/run_on_orin1.sh ch5-overhead` | Calls `./scripts/experiments/run_prima_overhead.sh` on Orin1. |
 
 The default Chapter 5 concurrent comparison uses the following memory-budget
 conditions:
