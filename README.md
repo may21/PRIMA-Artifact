@@ -91,18 +91,22 @@ Run these wrappers directly on the edge node.
 | CLIP generalization | `./scripts/experiments/run_clip_generalization.sh` | CLIP ViT-B/32 and RN50 Docker profiling. | Peak system RAM, peak container memory, elapsed time, and CLIP summary CSVs. |
 | PRIMA overhead | `./scripts/experiments/run_prima_overhead.sh` | Predictor and Calculator overhead measurement over the ONNX model list. | Feature extraction, RF prediction, and Calculator overhead. |
 
-The master-node launcher runs the same edge-node wrappers through SSH.
+From a master node, use the same launcher with a target name:
 
-| Target | Master-node command | Purpose |
-|---|---|---|
-| `ch3-isolated` | `./scripts/master/run_on_orin1.sh ch3-isolated` | Calls `./scripts/experiments/run_isolated_baseline.sh` on Orin1. |
-| `ch3-concurrent` | `./scripts/master/run_on_orin1.sh ch3-concurrent` | Calls `./scripts/experiments/run_concurrent_comparison.sh` with `MODE_LIST="ts_unlimited mps20_unlimited"`. |
-| `ch3-sweep` | `./scripts/master/run_on_orin1.sh ch3-sweep` | Calls `./scripts/experiments/run_memory_sweep.sh` on Orin1. |
-| `ch5-concurrent` | `./scripts/master/run_on_orin1.sh ch5-concurrent` | Calls `./scripts/experiments/run_concurrent_comparison.sh` with all default concurrent modes. |
-| `ch5-mps` | `./scripts/master/run_on_orin1.sh ch5-mps` | Calls `./scripts/experiments/run_mps_partitioning.sh` on Orin1. |
-| `ch5-goodput` | `./scripts/master/run_on_orin1.sh ch5-goodput` | Calls `./scripts/experiments/run_goodput_latency.sh` on Orin1. |
-| `ch5-clip` | `./scripts/master/run_on_orin1.sh ch5-clip` | Calls `./scripts/experiments/run_clip_generalization.sh` on Orin1. |
-| `ch5-overhead` | `./scripts/master/run_on_orin1.sh ch5-overhead` | Calls `./scripts/experiments/run_prima_overhead.sh` on Orin1. |
+```bash
+./scripts/master/run_on_orin1.sh <target>
+```
+
+| Target | Runs on Orin1 |
+|---|---|
+| `ch3-isolated` | Isolated baseline |
+| `ch3-concurrent` | Concurrent TS and MPS 20% only |
+| `ch3-sweep` | Isolated memory sweep |
+| `ch5-concurrent` | Full concurrent comparison |
+| `ch5-mps` | MPS 20% vs. MPS 50% partitioning |
+| `ch5-goodput` | Goodput latency |
+| `ch5-clip` | CLIP generalization |
+| `ch5-overhead` | PRIMA overhead |
 
 The default Chapter 5 concurrent comparison uses the following memory-budget
 conditions:
