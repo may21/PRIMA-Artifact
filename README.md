@@ -154,7 +154,7 @@ The repository includes only the small predictor feature table:
 datasets/predictor_memory_features.csv
 ```
 
-## 6. File locations
+## 6. Orin1 layout
 
 GitHub repository:
 
@@ -176,15 +176,15 @@ GitHub repository:
 | `scripts/setup/` | Environment and helper scripts |
 | `requirements.txt` | Python dependencies |
 
-Orin1 storage:
+Prepared Orin1:
 
-Use the GitHub clone as the working directory:
+Use the prepared GitHub clone as the working directory:
 
 ```bash
 cd /home/orin1/woosy/PRIMA
 ```
 
-The current Orin1 layout keeps code, external assets, and goodput datasets in
+The prepared Orin1 layout keeps code, external assets, and goodput datasets in
 separate locations:
 
 ```text
@@ -205,12 +205,10 @@ separate locations:
 | `/home/orin1/prima_artifacts/clip` | CLIP model/data cache and result files |
 | `/home/orin1/prima_artifacts/onnx_cache` | ONNX files used by the overhead runner |
 | `/home/orin1/ssd/prima_goodput_5000` | Goodput image datasets prepared outside GitHub |
-| `/mnt/prima_usb/prima_dataset_expansion` | Existing model/profile backup artifacts, not required for goodput dataset preparation |
 
 On the current Orin1 machine, `prima_artifacts` contains real directories for
 the required external assets. Goodput datasets are stored directly on the Orin1
-SSD because the attached USB device showed very slow write throughput during
-dataset preparation.
+SSD.
 
 For the goodput dataset, CLS uses ImageNet images and DET/EST/SEG share COCO
 images. OBB uses DOTA val/test original images without crop, tile, or source
