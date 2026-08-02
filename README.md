@@ -217,9 +217,7 @@ COCO images. OBB uses the available DOTA val/test images as-is; if fewer than
 ## 7. ETRI workload note
 
 The ETRI workload was prepared on a separate Jetson Orin Nano edge node
-(`orin-test`). That node is currently not connected; the workload is stored on
-its SSD, and the USB device provided by ETRI must also be connected when using
-this workload.
+(`orin-test`).
 
 Workload directory on `orin-test`:
 
