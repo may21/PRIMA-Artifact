@@ -1,0 +1,22 @@
+# Second major revision, reviewer comment C: allocation-policy baselines.
+# All limited policies distribute the same total budget (AMU) over the five
+# workloads; only the split rule differs.
+name: revision2_allocation_baselines_100
+num_images: 100
+repeats: 3
+gpu_sharing: time_slicing          # MPS counterparts deferred (mps20_equal, mps20_oracle)
+modes:
+  - ts_unlimited                   # None   : paper TS baseline, no limits
+  - ts_equal                       # Equal  : AMU / 5
+  - ts_oracle                      # Oracle : AMU * MM_i / sum(MM), MM = measured isolated usage
+  - ts_memlimit                    # PRIMA  : AMU * PMU_i / sum(PMU), PMU = predicted usage
+total_budget_mib: 6842             # sum of the PRIMA budgets below
+prima_budgets_mib:
+  classify: 821
+  detect: 1071
+  pose: 1068
+  segment: 1649
+  obb: 2233
+equal_budget_mib: 1368             # floor(6842 / 5)
+oracle_budgets_mib: derived        # scripts/runners/yolo/compute_allocation_baselines.py
+oracle_source: isolated_no_memlimit_100 pidstat peak (max), averaged over repeats

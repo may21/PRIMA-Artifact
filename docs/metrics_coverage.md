@@ -15,6 +15,7 @@ artifacts. Raw result directories are intentionally excluded from GitHub.
 | Goodput and latency percentiles | Per-request inference latency for 5,000 requests per workload, p50/p90/p99 derivable from raw latency CSVs | `scripts/experiments/run_goodput_latency.sh` | `inference_latency.csv`, `organized/inference_times_raw.csv`, `organized/inference_times_wide.csv`, `organized/run_summary.csv`, `organized/validation.txt` |
 | CLIP generalization | Peak system RAM, peak container memory, elapsed time | `scripts/experiments/run_clip_generalization.sh` | `clip_memory_peak_raw.csv`, `clip_memory_peak_average.csv`, per-run `system_tegrastats.txt`, `docker_stats.txt`, `summary.txt` |
 | PRIMA overhead | ONNX feature extraction, RF prediction, and Calculator elapsed time | `scripts/experiments/run_prima_overhead.sh` | `overhead_raw.csv`, `overhead_summary.csv` |
+| Allocation-policy baselines (revision 2, comment C) | Mean/SD/p50/p99 inference time, OOM kills, page-fault rate, and total elapsed time under None/Equal/Oracle/PRIMA with the same total budget | `scripts/experiments/run_allocation_baselines.sh` | `allocation_budgets.csv`, `organized/allocation_baselines_summary.csv`, `organized/allocation_baselines_summary.md`, plus the organized concurrent files |
 
 Known requirements before a full rerun:
 

@@ -19,6 +19,11 @@ MODE_ORDER = {
     "mps20_unlimited": 1,
     "ts_memlimit": 2,
     "mps20_memlimit": 3,
+    # allocation-policy baselines (second major revision)
+    "ts_equal": 4,
+    "ts_oracle": 5,
+    "mps20_equal": 6,
+    "mps20_oracle": 7,
 }
 TEGRА_RE = re.compile(
     r"^(?P<date>\d{2}-\d{2}-\d{4})\s+(?P<time>\d{2}:\d{2}:\d{2})\s+"

@@ -90,6 +90,7 @@ Run these wrappers directly on the edge node.
 | Goodput latency | `./scripts/experiments/run_goodput_latency.sh` | Runs five concurrent YOLO goodput workloads for 5,000 requests per workload and exports latency summary CSVs. |
 | CLIP generalization | `./scripts/experiments/run_clip_generalization.sh` | Profiles CLIP ViT-B/32 and RN50; collects peak RAM, peak container memory, elapsed time, and CLIP summaries. |
 | PRIMA overhead | `./scripts/experiments/run_prima_overhead.sh` | Measures feature extraction, RF prediction, and Calculator overhead over the ONNX model list. |
+| Allocation-policy baselines (revision 2) | `./scripts/experiments/run_allocation_baselines.sh` | Runs five YOLO workloads under TS with the same total memory budget split by four policies: None (unlimited), Equal (AMU/5), Oracle (proportional to measured isolated usage), and PRIMA (proportional to predicted usage). Needs the isolated-baseline results for the Oracle budgets. |
 
 From a master node, use the same launcher with a target name:
 
@@ -107,6 +108,7 @@ From a master node, use the same launcher with a target name:
 | `ch5-goodput` | Goodput latency |
 | `ch5-clip` | CLIP generalization |
 | `ch5-overhead` | PRIMA overhead |
+| `ch5-baselines` | Revision 2 allocation-policy baselines (None/Equal/Oracle/PRIMA under TS) |
 
 The default Chapter 5 concurrent comparison uses the following memory-budget
 conditions:
@@ -127,6 +129,41 @@ pose     1068m
 segment  1649m
 obb      2233m
 ```
+
+### Allocation-policy baselines (second major revision)
+
+Reviewer comment C asks for baselines that isolate the value of the Predictor
+and of proportional allocation. `run_allocation_baselines.sh` reuses the
+concurrent runner with four modes that distribute the **same total budget**
+(`TOTAL_BUDGET_MIB`, default 6842 MiB = the sum of the PRIMA budgets):
+
+| Mode | Policy | Per-workload limit |
+|---|---|---|
+| `ts_unlimited` | None | no limit (paper TS baseline) |
+| `ts_equal` | Equal | `TOTAL_BUDGET_MIB / 5` = 1368 MiB each |
+| `ts_oracle` | Oracle | `TOTAL_BUDGET_MIB * MM_i / sum(MM)`, `MM_i` = measured isolated usage |
+| `ts_memlimit` | PRIMA | `TOTAL_BUDGET_MIB * PMU_i / sum(PMU)`, `PMU_i` = predicted usage (paper budgets) |
+
+The Oracle budgets are derived by `scripts/runners/yolo/compute_allocation_baselines.py`
+from the pidstat peak memory of the isolated baseline
+(`results/isolated_no_memlimit_100_*/organized/isolated_no_memlimit_pidstat_memory_peak_summary.csv`),
+or from explicit values:
+
+```bash
+sudo -v
+ISOLATED_RESULT_ROOT=/home/orin1/prima_artifacts/yolo/results/isolated_no_memlimit_100_1 \
+  ./scripts/experiments/run_allocation_baselines.sh
+# or
+ORACLE_MEASURED_MIB="classify=600 detect=800 pose=800 segment=900 obb=2000" \
+  ./scripts/experiments/run_allocation_baselines.sh
+```
+
+Results land in `results/allocation_baselines_<n>/` with the usual raw and
+organized CSVs plus `allocation_budgets.csv` (every policy's budgets) and
+`organized/allocation_baselines_summary.{csv,md}` (completed runs, OOM kills,
+mean/SD/p50/p99 latency, page faults per second, per-mode elapsed time).
+Set `MODE_LIST="mps20_unlimited mps20_equal mps20_oracle mps20_memlimit"` for
+the MPS counterparts.
 
 ## 5. External assets
 

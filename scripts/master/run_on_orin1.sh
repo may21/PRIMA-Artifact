@@ -16,6 +16,7 @@ Targets:
   ch5-goodput       Chapter 5 goodput/latency percentile.
   ch5-clip          Chapter 5 CLIP generalization.
   ch5-overhead      Chapter 5 PRIMA predictor/calculator overhead.
+  ch5-baselines     Revision 2: TS allocation-policy baselines (None/Equal/Oracle/PRIMA).
 
 Environment:
   ORIN_HOST          SSH host alias or host name. Default: orin1
@@ -30,6 +31,7 @@ Experiment overrides are passed through when set:
   UNIQUE_IMAGES LOOPS REQUESTS MODELS PRIMA_ARTIFACT_ROOT EXPERIMENT_ROOT
   YOLO_ROOT DATASET_ROOT CLIP_ROOT GOODPUT_ROOT GOODPUT_DATASET_ROOT
   GOODPUT_RESULT_OVERRIDE OUTPUT_DIR MODEL_CSV
+  ISOLATED_RESULT_ROOT ORACLE_MEASURED_MIB BUDGET_FILE TOTAL_BUDGET_MIB ORACLE_STATISTIC
 MSG
 }
 
@@ -65,7 +67,8 @@ for name in \
   NUM_IMAGES REPEATS REPEAT_START REPEAT_END MODE_LIST MPS_LEVELS \
   UNIQUE_IMAGES UNIQUE_IMAGES_OBB LOOPS REQUESTS MODELS PRIMA_ARTIFACT_ROOT EXPERIMENT_ROOT \
   YOLO_ROOT DATASET_ROOT CLIP_ROOT GOODPUT_ROOT GOODPUT_DATASET_ROOT \
-  GOODPUT_RESULT_OVERRIDE OUTPUT_DIR MODEL_CSV
+  GOODPUT_RESULT_OVERRIDE OUTPUT_DIR MODEL_CSV \
+  ISOLATED_RESULT_ROOT ORACLE_MEASURED_MIB BUDGET_FILE TOTAL_BUDGET_MIB ORACLE_STATISTIC
 do
   append_env "$name"
 done
@@ -98,6 +101,9 @@ case "$target" in
     ;;
   ch5-overhead)
     remote_cmd="./scripts/experiments/run_prima_overhead.sh"
+    ;;
+  ch5-baselines)
+    remote_cmd="./scripts/experiments/run_allocation_baselines.sh"
     ;;
   *)
     echo "[ERROR] Unknown target: $target" >&2

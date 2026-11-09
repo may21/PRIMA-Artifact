@@ -4,8 +4,19 @@ set -euo pipefail
 # Four concurrent-execution conditions:
 #   1) ts_unlimited       : Time-slicing, no per-container memory limit
 #   2) mps20_unlimited    : MPS 20% per context (= 2 SM on this Orin), no memory limit
-#   3) ts_memlimit        : Time-slicing, workload-specific memory limits
-#   4) mps20_memlimit     : MPS 20% per context + workload-specific memory limits
+#   3) ts_memlimit        : Time-slicing, PRIMA (predicted-proportional) memory limits
+#   4) mps20_memlimit     : MPS 20% per context + PRIMA memory limits
+#
+# Allocation-policy baselines (second major revision, reviewer comment C):
+#   5) ts_equal / mps20_equal   : the same total budget split equally (AMU / 5)
+#   6) ts_oracle / mps20_oracle : the same total budget split in proportion to
+#                                 the MEASURED isolated memory usage of each
+#                                 workload (profiling oracle; no Predictor)
+#   Equal/oracle budgets are controlled by TOTAL_BUDGET_MIB (default: the sum
+#   of the PRIMA budgets, so every limited policy distributes the same memory),
+#   EQUAL_BUDGET (e.g. 1368m) and ORACLE_BUDGETS (e.g. "classify=800m detect=...").
+#   scripts/runners/yolo/compute_allocation_baselines.py derives both from the
+#   isolated-baseline results.
 #
 # All conditions:
 #   - start five workloads concurrently through a shared start gate
@@ -47,7 +58,7 @@ declare -A SCRIPTS=(
   [obb]="obb.py"
 )
 
-# Original per-workload Docker memory limits.
+# Original per-workload Docker memory limits (PRIMA budgets B_i).
 declare -A MEM_LIMITS=(
   [classify]="821m"
   [detect]="1071m"
@@ -55,6 +66,51 @@ declare -A MEM_LIMITS=(
   [segment]="1649m"
   [obb]="2233m"
 )
+
+# Total memory distributed by every limited policy (MiB). Default: sum of B_i.
+TOTAL_BUDGET_MIB="${TOTAL_BUDGET_MIB:-6842}"
+
+# Equal split: TOTAL_BUDGET_MIB / number of workloads, unless EQUAL_BUDGET is given.
+declare -A EQUAL_LIMITS=()
+EQUAL_BUDGET="${EQUAL_BUDGET:-$((TOTAL_BUDGET_MIB / ${#WORKLOADS[@]}))m}"
+for workload in "${WORKLOADS[@]}"; do
+  EQUAL_LIMITS[$workload]="$EQUAL_BUDGET"
+done
+
+# Oracle split: ORACLE_BUDGETS="classify=NNNm detect=NNNm pose=NNNm segment=NNNm obb=NNNm"
+declare -A ORACLE_LIMITS=()
+if [[ -n "${ORACLE_BUDGETS:-}" ]]; then
+  for pair in $ORACLE_BUDGETS; do
+    ORACLE_LIMITS["${pair%%=*}"]="${pair#*=}"
+  done
+fi
+
+is_mps_mode() {
+  [[ "$1" == mps20_* ]]
+}
+
+is_memlimit_mode() {
+  [[ "$1" == *_memlimit || "$1" == *_equal || "$1" == *_oracle ]]
+}
+
+policy_for_mode() {
+  case "$1" in
+    *_memlimit) echo prima ;;
+    *_equal) echo equal ;;
+    *_oracle) echo oracle ;;
+    *) echo unlimited ;;
+  esac
+}
+
+budget_for_mode() {
+  local mode="$1" workload="$2"
+  case "$mode" in
+    *_memlimit) echo "${MEM_LIMITS[$workload]}" ;;
+    *_equal) echo "${EQUAL_LIMITS[$workload]}" ;;
+    *_oracle) echo "${ORACLE_LIMITS[$workload]:-}" ;;
+    *) echo unlimited ;;
+  esac
+}
 
 PERF_EVENTS="page-faults,cache-references,cache-misses,L1-dcache-loads,L1-dcache-load-misses,L1-icache-loads,L1-icache-load-misses,l2d_cache,l2d_cache_refill,LLC-loads,LLC-load-misses"
 
@@ -74,14 +130,6 @@ MONITOR_PIDS=()
 PERF_PIDS=()
 CGROUP_MONITOR_PIDS=()
 ORIGINAL_PERF_PARANOID=""
-
-is_mps_mode() {
-  [[ "$1" == "mps20_unlimited" || "$1" == "mps20_memlimit" ]]
-}
-
-is_memlimit_mode() {
-  [[ "$1" == "ts_memlimit" || "$1" == "mps20_memlimit" ]]
-}
 
 stop_pid_list() {
   local pid
@@ -162,6 +210,26 @@ if ! [[ "$IMAGE_LIMIT" =~ ^[1-9][0-9]*$ ]]; then
   exit 2
 fi
 
+for mode in "${MODES[@]}"; do
+  case "$mode" in
+    ts_unlimited|ts_memlimit|ts_equal|ts_oracle|\
+    mps20_unlimited|mps20_memlimit|mps20_equal|mps20_oracle) ;;
+    *)
+      echo "[ERROR] unknown mode: $mode" >&2
+      exit 2
+      ;;
+  esac
+  if [[ "$mode" == *_oracle ]]; then
+    for workload in "${WORKLOADS[@]}"; do
+      [[ -n "${ORACLE_LIMITS[$workload]:-}" ]] || {
+        echo "[ERROR] mode $mode needs ORACLE_BUDGETS for every workload (missing: $workload)." >&2
+        echo "        Generate them with scripts/runners/yolo/compute_allocation_baselines.py." >&2
+        exit 2
+      }
+    done
+  fi
+done
+
 for command_name in docker perf pidstat mpstat vmstat top tegrastats nvidia-cuda-mps-control; do
   command -v "$command_name" >/dev/null 2>&1 || {
     echo "[ERROR] missing command: $command_name" >&2
@@ -224,6 +292,10 @@ echo "mode,repeat,workload,memory_limit,swap_max,container,exit_status,oom_kille
   echo "image_limit=$IMAGE_LIMIT"
   echo "requested_power_mode=${POWER_MODE_NAME:-unchanged}"
   echo "modes=${MODES[*]}"
+  echo "prima_budgets=classify=${MEM_LIMITS[classify]} detect=${MEM_LIMITS[detect]} pose=${MEM_LIMITS[pose]} segment=${MEM_LIMITS[segment]} obb=${MEM_LIMITS[obb]}"
+  echo "total_budget_mib=${TOTAL_BUDGET_MIB}"
+  echo "equal_budget=${EQUAL_BUDGET}"
+  echo "oracle_budgets=${ORACLE_BUDGETS:-unset}"
   echo "mps_active_thread_percentage=20"
   echo "effective_mps_sm=2 (empirically verified on this device)"
   echo "swap_policy=memory.swap.max=0 for every container before workload release"
@@ -288,9 +360,8 @@ for mode in "${MODES[@]}"; do
         -v "${GATE_DIR}:/start_gate"
       )
 
-      memory_limit="unlimited"
+      memory_limit="$(budget_for_mode "$mode" "$workload")"
       if is_memlimit_mode "$mode"; then
-        memory_limit="${MEM_LIMITS[$workload]}"
         create_args+=(
           --memory="$memory_limit"
           --memory-swap="$memory_limit"
@@ -321,6 +392,7 @@ repeat=${repeat}
 workload=${workload}
 script=${SCRIPTS[$workload]}
 container=${cname}
+allocation_policy=$(policy_for_mode "$mode")
 memory_limit=${memory_limit}
 swap_max=0
 mps_active_thread_percentage=$([[ "$mode" == mps20_* ]] && echo 20 || echo unset)
@@ -449,8 +521,7 @@ EOF
         awk -F, 'NR>1 && $4 ~ /^[0-9]+$/ && $4>m {m=$4} END{print m+0}' \
           "${workload_dir}/cgroup_memory.csv"
       )"
-      memory_limit="unlimited"
-      is_memlimit_mode "$mode" && memory_limit="${MEM_LIMITS[$workload]}"
+      memory_limit="$(budget_for_mode "$mode" "$workload")"
 
       echo "${mode},${repeat},${workload},${memory_limit},0,${cname},${exit_status},${oom_killed},${workload_dir}" \
         >> "$SUMMARY"
