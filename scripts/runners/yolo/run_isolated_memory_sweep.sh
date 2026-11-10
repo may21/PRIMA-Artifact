@@ -1,12 +1,13 @@
 #!/bin/bash
 set -euo pipefail
+source "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/../../lib/prima_common.sh"
 
 REPEATS="${1:-1}"
 IMAGE="${IMAGE:-ultralytics/ultralytics:8.3.102-jetson-jetpack6}"
 PRIMA_ARTIFACT_ROOT="${PRIMA_ARTIFACT_ROOT:-/home/orin1/prima_artifacts}"
 EXPERIMENT_ROOT="${EXPERIMENT_ROOT:-${PRIMA_ARTIFACT_ROOT}/yolo}"
 HOST_YOLO_DIR="${HOST_YOLO_DIR:-${EXPERIMENT_ROOT}/workload}"
-DATASET_ROOT="${DATASET_ROOT:-${PRIMA_ARTIFACT_ROOT}/yolo_runtime}"
+DATASET_ROOT="$(prima_resolve_dataset_root "$EXPERIMENT_ROOT")"
 RESULT_BASE="${RESULT_BASE:-${EXPERIMENT_ROOT}/results}"
 CONTAINER_YOLO_DIR="/usr/src/ultralytics/yolo_new"
 START_DELAY_SECONDS=7
@@ -83,16 +84,13 @@ cleanup() {
     sudo -n sysctl -w "kernel.perf_event_paranoid=${ORIGINAL_PERF_PARANOID}" \
       >/dev/null 2>&1 || true
   fi
+  prima_tty_restore
   exit "$rc"
 }
 trap cleanup EXIT INT TERM
 
-for command_name in docker perf pidstat mpstat vmstat top tegrastats; do
-  command -v "$command_name" >/dev/null 2>&1 || {
-    echo "[ERROR] missing command: $command_name" >&2
-    exit 1
-  }
-done
+prima_require_commands docker pidstat mpstat vmstat top tegrastats
+prima_require_perf
 docker image inspect "$IMAGE" >/dev/null 2>&1 || {
   echo "[ERROR] missing image: $IMAGE" >&2
   exit 1
@@ -133,6 +131,9 @@ fi
   echo "repeat_range=${REPEAT_START}-${REPEAT_END}"
   echo "image_limit=${IMAGE_LIMIT}"
   echo "host_yolo_dir=${HOST_YOLO_DIR}"
+  echo "dataset_root=${DATASET_ROOT}"
+  echo "perf_bin=${PERF_BIN}"
+  echo "locale=${LC_ALL}"
   echo "dataset_root=${DATASET_ROOT}"
   echo "memory_limits=${MEMORY_LIMITS[*]}"
   echo "swap_policy=host swap off; docker memory-swap equals memory limit; cgroup swap.current sampled"
@@ -232,7 +233,7 @@ EOF
 
       if [[ -n "$host_pid" ]]; then
         echo "$host_pid" > "${RUN_DIR}/python_pid.txt"
-        perf stat -I 1000 -x, \
+        "$PERF_BIN" stat -I 1000 -x, \
           -e page-faults,cache-references,cache-misses,L1-dcache-loads,L1-dcache-load-misses,L1-icache-loads,L1-icache-load-misses,l2d_cache,l2d_cache_refill,LLC-loads,LLC-load-misses \
           -p "$host_pid" > "${RUN_DIR}/perf.csv" 2>&1 &
         PERF_PID=$!

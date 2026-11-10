@@ -1,5 +1,6 @@
 #!/bin/bash
 set -euo pipefail
+source "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/../../lib/prima_common.sh"
 
 # Four concurrent-execution conditions:
 #   1) ts_unlimited       : Time-slicing, no per-container memory limit
@@ -35,7 +36,7 @@ IMAGE="${IMAGE:-ultralytics/ultralytics:8.3.102-jetson-jetpack6}"
 PRIMA_ARTIFACT_ROOT="${PRIMA_ARTIFACT_ROOT:-/home/orin1/prima_artifacts}"
 EXPERIMENT_ROOT="${EXPERIMENT_ROOT:-${PRIMA_ARTIFACT_ROOT}/yolo}"
 HOST_YOLO_DIR="${HOST_YOLO_DIR:-${EXPERIMENT_ROOT}/workload}"
-DATASET_ROOT="${DATASET_ROOT:-${EXPERIMENT_ROOT}/workload}"
+DATASET_ROOT="$(prima_resolve_dataset_root "$EXPERIMENT_ROOT")"
 RESULT_BASE="${RESULT_BASE:-${EXPERIMENT_ROOT}/results}"
 CONTAINER_YOLO_DIR="/usr/src/ultralytics/yolo_new"
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -197,6 +198,7 @@ cleanup() {
     sudo -n sysctl -w "kernel.perf_event_paranoid=${ORIGINAL_PERF_PARANOID}" \
       >/dev/null 2>&1 || true
   fi
+  prima_tty_restore
   exit "$rc"
 }
 trap cleanup EXIT INT TERM
@@ -230,12 +232,8 @@ for mode in "${MODES[@]}"; do
   fi
 done
 
-for command_name in docker perf pidstat mpstat vmstat top tegrastats nvidia-cuda-mps-control; do
-  command -v "$command_name" >/dev/null 2>&1 || {
-    echo "[ERROR] missing command: $command_name" >&2
-    exit 1
-  }
-done
+prima_require_commands docker pidstat mpstat vmstat top tegrastats nvidia-cuda-mps-control
+prima_require_perf
 
 if [[ "$(stat -fc %T /sys/fs/cgroup)" != "cgroup2fs" ]]; then
   echo "[ERROR] cgroup v2 is required to enforce memory.swap.max=0" >&2
@@ -304,7 +302,11 @@ echo "mode,repeat,workload,memory_limit,swap_max,container,exit_status,oom_kille
   echo "nsight_compute=disabled"
   nvpmodel -q 2>/dev/null | tr '\n' ' '
   echo
+  echo "dataset_root=${DATASET_ROOT}"
+  echo "perf_bin=${PERF_BIN}"
+  echo "locale=${LC_ALL}"
 } > "${RESULT_ROOT}/experiment_config.txt"
+prima_tty_prepare
 
 echo "[INFO] result root: $RESULT_ROOT"
 echo "[INFO] repeat range: ${REPEAT_START}-${REPEAT_END}"
@@ -489,7 +491,7 @@ EOF
         )"
         if [[ -n "$python_pid" ]]; then
           echo "$python_pid" > "${workload_dir}/python_pid.txt"
-          perf stat -I 1000 -x, -e "$PERF_EVENTS" -p "$python_pid" \
+          "$PERF_BIN" stat -I 1000 -x, -e "$PERF_EVENTS" -p "$python_pid" \
             > "${workload_dir}/perf.csv" 2>&1 &
           PERF_PIDS+=("$!")
           PERF_ATTACHED["$cname"]="$python_pid"

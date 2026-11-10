@@ -50,30 +50,87 @@ Manager -> Predictor -> Calculator -> Workload Launcher -> Metrics Collector
 
 ## 3. Setup
 
-Clone the repository on the edge node:
+### 3.1 Directory layout
 
-```bash
-git clone https://github.com/woosy123/PRIMA.git
-cd PRIMA
-python3 -m pip install -r requirements.txt
+Code, artifacts and large datasets live side by side under one work root.
+Every runner derives its paths from these variables, so the same commands
+work on any Jetson:
+
+```text
+$PRIMA_WORK_ROOT/
+├── PRIMA-Artifact/          this repository
+├── prima_artifacts/         $PRIMA_ARTIFACT_ROOT
+│   ├── yolo/workload/       workload scripts, .pt/.onnx/.engine, image_lists/, 100-image inputs
+│   ├── yolo/results/        YOLO experiment results
+│   ├── yolo_runtime/        optional: 100-image inputs, if kept apart from workload/
+│   ├── goodput/results/     goodput results
+│   ├── clip/                CLIP weights, CIFAR-100, results
+│   └── onnx_cache/          ONNX graphs for the overhead experiment
+└── ssd/                     $PRIMA_SSD_ROOT
+    └── prima_goodput_5000/  5,000-image ImageNet/COCO/DOTA sets for goodput
 ```
 
-Check the edge-node environment:
+```bash
+export PRIMA_WORK_ROOT=$HOME/prima_test        # any writable location
+export PRIMA_ARTIFACT_ROOT=$PRIMA_WORK_ROOT/prima_artifacts
+export PRIMA_SSD_ROOT=$PRIMA_WORK_ROOT/ssd
+```
+
+`PRIMA_WORK_ROOT` alone is enough: the other two default to the layout above.
+Without any of them, the original orin1 paths are used.
+The work root must be on a filesystem that supports Unix ownership: exFAT/FAT
+mounts are owned by root and cannot be written by the experiment user.
+
+Path overrides, when a machine deviates from the layout:
+
+| Variable | Default | Used by |
+|---|---|---|
+| `DATASET_ROOT` | `prima_artifacts/yolo_runtime` if it holds `expanded_coco_images`, else `prima_artifacts/yolo/workload` | YOLO runners |
+| `YOLO_ROOT` | the first of `yolo_runtime`, `yolo/workload` that holds `yolov8n.engine` | goodput |
+| `GOODPUT_DATASET_ROOT` | `$PRIMA_SSD_ROOT/prima_goodput_5000` | goodput |
+| `CLIP_ROOT` | `$PRIMA_ARTIFACT_ROOT/clip` | CLIP |
+| `PERF_BIN` | the first `perf` that runs on this kernel | perf-based runners |
+
+### 3.2 One-time preparation
+
+```bash
+git clone https://github.com/may21/PRIMA-Artifact.git "$PRIMA_WORK_ROOT/PRIMA-Artifact"
+cd "$PRIMA_WORK_ROOT/PRIMA-Artifact"
+python3 -m pip install -r requirements.txt        # a virtualenv is recommended
+
+sudo nvpmodel -m 0                                # 15 W mode on Orin Nano (check with nvpmodel -q)
+sudo swapoff -a
+sudo apt install time linux-nvidia-tegra-tools-5.15.0-1030   # /usr/bin/time and a working perf; match your kernel ABI
+
+docker pull ultralytics/ultralytics:8.3.102-jetson-jetpack6
+./scripts/setup/prepare_goodput_datasets.sh       # 5,000-image sets in $PRIMA_SSD_ROOT
+./scripts/setup/export_yolo_engines.sh            # .onnx/.engine in yolo/workload, ONNX copy in onnx_cache
+./scripts/setup/prepare_yolo_inputs.sh            # 100-image inputs and image_lists/*_100.txt
+./scripts/setup/build_clip_image.sh               # clip-full:jetson, CIFAR-100, CLIP weights
+```
+
+Copy the five workload scripts (`classify.py`, `detect.py`, `pose.py`,
+`segment.py`, `obb.py`) into `$PRIMA_ARTIFACT_ROOT/yolo/workload/`. Their
+interface is described in [docs/workload_interface.md](docs/workload_interface.md).
+
+Then verify the node; it lists every missing item:
 
 ```bash
 ./scripts/setup/check_orin_env.sh
-nvpmodel -q
-cat /proc/swaps
 ```
 
-`nvpmodel -q` verifies the paper power mode, and `/proc/swaps` verifies that
-swap is disabled before memory-isolation experiments.
+### 3.3 Notes
 
-If experiments are launched from a separate master node, configure SSH access to
-the edge node and run:
+- Runners force `LC_ALL=C`, so sysstat logs are parsed correctly on machines
+  with a non-English locale. Logs collected earlier under a Korean locale are
+  also accepted by the organizers.
+- Run `sudo -v` first and start the experiment scripts as the normal user; they
+  call `sudo -n` only for `perf_event_paranoid`, swap and cgroup control.
+- If experiments are launched from a separate master node, configure SSH access
+  to the edge node and run:
 
 ```bash
-ORIN_HOST=$EDGE_HOST ORIN_PORT=$EDGE_PORT \
+ORIN_HOST=$EDGE_HOST ORIN_PORT=$EDGE_PORT ORIN_REPO=$PRIMA_WORK_ROOT/PRIMA-Artifact \
   ./scripts/master/run_on_orin1.sh check-env
 ```
 
@@ -167,172 +224,13 @@ the MPS counterparts.
 
 ## 5. External assets
 
-Prepare these assets on the edge node before running the full artifact:
+Large or device-specific assets are excluded from GitHub and prepared with the
+scripts in Section 3.2:
 
-| Asset | Notes |
-|---|---|
-| YOLO workload assets and results | `/home/orin1/prima_artifacts/yolo` |
-| YOLO runtime images and TensorRT engines | `/home/orin1/prima_artifacts/yolo_runtime` |
-| Goodput datasets | `/home/orin1/ssd/prima_goodput_5000` |
-| Goodput state and results | `/home/orin1/prima_artifacts/goodput` |
-| CLIP model/data cache and results | `/home/orin1/prima_artifacts/clip` |
-| ONNX files for overhead measurement | `/home/orin1/prima_artifacts/onnx_cache` |
-
-These assets are excluded from GitHub because they are large or machine-specific.
-Experiment runners and result organizers are included under `scripts/runners/`.
-The CLIP runtime was built from `ultralytics/ultralytics:8.3.102-jetson-jetpack6`
-by installing [openai/CLIP](https://github.com/openai/CLIP) with pip, excluding
-the conda-based PyTorch installation command from the CLIP README. Only the
-base Ultralytics image is kept on the edge node by default.
-
-The repository includes only the small predictor feature table:
-
-```text
-datasets/predictor_memory_features.csv
-```
-
-## 6. Orin1 layout
-
-GitHub repository:
-
-| Path | Contents |
-|---|---|
-| `configs/devices/orin_nano_15w.yaml` | Jetson Orin Nano paper environment |
-| `configs/experiments/paper_concurrent_4mode_100.yaml` | Concurrent TS/MPS/PRIMA experiment configuration |
-| `configs/workloads/yolo_100.yaml` | YOLO workload configuration |
-| `configs/workloads/goodput_5000.yaml` | Goodput workload configuration |
-| `configs/workloads/overhead_models.csv` | ONNX paths used by the overhead runner |
-| `datasets/predictor_memory_features.csv` | Small predictor feature table |
-| `prima/` | PRIMA implementation modules |
-| `scripts/experiments/` | Edge-node experiment wrappers |
-| `scripts/master/run_on_orin1.sh` | Master-node SSH launcher |
-| `scripts/runners/yolo/` | YOLO concurrent, memory-sweep, and result-organization runners |
-| `scripts/runners/goodput/` | Goodput latency runner and organizer |
-| `scripts/runners/clip/` | CLIP Docker runners, inference scripts, and summarizer |
-| `scripts/runners/overhead/` | Predictor and Calculator overhead runner |
-| `scripts/setup/` | Environment and helper scripts |
-| `requirements.txt` | Python dependencies |
-
-Prepared Orin1:
-
-Use the prepared GitHub clone as the working directory:
-
-```bash
-cd /home/orin1/woosy/PRIMA
-```
-
-The prepared Orin1 layout keeps code, external assets, and goodput datasets in
-separate locations:
-
-```text
-/home/orin1/woosy/PRIMA              GitHub clone and experiment scripts
-/home/orin1/prima_artifacts          External assets used by the scripts
-/home/orin1/ssd/prima_goodput_5000   Goodput image datasets
-```
-
-| Path | Contents |
-|---|---|
-| `/home/orin1/woosy/PRIMA` | GitHub clone used by `scripts/master/run_on_orin1.sh` |
-| `/home/orin1/prima_artifacts/yolo` | YOLO workload assets, image lists, and result root |
-| `/home/orin1/prima_artifacts/yolo/workload/image_lists` | `coco_100.txt`, `dota_100.txt`, `imagenet_100.txt` |
-| `/home/orin1/prima_artifacts/yolo/results` | Chapter 3 and concurrent YOLO result directories |
-| `/home/orin1/prima_artifacts/yolo_runtime` | YOLO runtime images and TensorRT engines |
-| `/home/orin1/prima_artifacts/goodput` | Goodput state and result root |
-| `/home/orin1/prima_artifacts/goodput/results` | Goodput result directories |
-| `/home/orin1/prima_artifacts/clip` | CLIP model/data cache and result files |
-| `/home/orin1/prima_artifacts/onnx_cache` | ONNX files used by the overhead runner |
-| `/home/orin1/ssd/prima_goodput_5000` | Goodput image datasets prepared outside GitHub |
-
-On Orin1, external assets are already placed under `prima_artifacts`, and
-goodput images are stored under `/home/orin1/ssd/prima_goodput_5000`.
-
-For goodput, CLS uses 5,000 ImageNet images. DET/EST/SEG use the same 5,000
-COCO images. OBB uses the available DOTA val/test images as-is; if fewer than
-5,000 DOTA images are present, the runner reuses the image list until it records
-5,000 requests.
-
-## 7. ETRI workload note
-
-The ETRI workload was prepared on a separate Jetson Orin Nano edge node
-(`orin-test`).
-
-Workload directory on `orin-test`:
-
-```text
-/home/orin-test/etri2
-```
-
-Recorded directory contents:
-
-```text
-172.17.11.121.mp4
-172.17.11.122.mp4
-test_deepDet_lib_console_lprDet
-test_deepDet_lib_console_speedDet
-```
-
-The workload used the JetPack-matched NVIDIA L4T image:
-
-```text
-nvcr.io/nvidia/l4t-jetpack:r36.4.0
-image id: 51f1e16a5dd9
-size: 9.83 GB
-```
-
-Container creation used the NVIDIA runtime option:
-
-```bash
-docker run -it --runtime=nvidia -v ~/etri2:/home 51f /bin/bash
-```
-
-Recorded container:
-
-```text
-container id: f7e3e981d06c
-image: 51f
-command: /bin/bash
-name: kind_faraday
-```
-
-Restart and attach:
-
-```bash
-docker start f7e
-docker attach f7e
-```
-
-After attaching to the container, the mounted `/home` directory contains the
-ETRI workload files.
-
-Run LPR detection:
-
-```bash
-cd /home
-cd test_deepDet_lib_console_lprDet
-./etriDeepDet
-```
-
-Run speed detection:
-
-```bash
-cd /home
-cd test_deepDet_lib_console_speedDet
-./etriDeepDet
-```
-
-During execution, the program prints recognition results for each frame and
-creates date/time-stamped result directories under `_Result`.
-
-Boot-time command sequence on the Jetson board:
-
-```bash
-mount /dev/sda1 ~/etri
-docker start f7e
-docker attach f7e
-cd /home
-cd test_deepDet_lib_console_lprDet
-./etriDeepDet
-```
-
-Use the container id shown by `docker ps -a` if it differs from the recorded
-`f7e` or `c6c` prefix.
+| Asset | Location | Prepared by |
+|---|---|---|
+| Workload scripts, `.pt`, `.onnx`, `.engine` | `$PRIMA_ARTIFACT_ROOT/yolo/workload` | copied; `export_yolo_engines.sh` |
+| 100-image inputs and image lists | `$PRIMA_ARTIFACT_ROOT/yolo/workload` (or `yolo_runtime`) | `prepare_yolo_inputs.sh` |
+| Goodput datasets | `$PRIMA_SSD_ROOT/prima_goodput_5000` | `prepare_goodput_datasets.sh` |
+| ONNX files for overhead measurement | `$PRIMA_ARTIFACT_ROOT/onnx_cache` | `export_yolo_engines.sh` |
+| CLIP image, weights and CIFAR-100 | `clip-full:jetson`, `$PRIMA_ARTIFACT_ROOT/clip` | `build_clip_image.sh` |

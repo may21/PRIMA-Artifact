@@ -1,11 +1,13 @@
 #!/usr/bin/env bash
 set -euo pipefail
+RUNNER_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+source "${RUNNER_DIR}/../../lib/prima_common.sh"
 PRIMA_ARTIFACT_ROOT="${PRIMA_ARTIFACT_ROOT:-/home/orin1/prima_artifacts}"
 BASE="${EXPERIMENT_ROOT:-${PRIMA_ARTIFACT_ROOT}/yolo}"
 cd "$BASE"
 IMAGE="${IMAGE:-ultralytics/ultralytics:8.3.102-jetson-jetpack6}"
 HOST_YOLO_DIR="${HOST_YOLO_DIR:-$BASE/workload}"
-DATASET_ROOT="${DATASET_ROOT:-${PRIMA_ARTIFACT_ROOT}/yolo_runtime}"
+DATASET_ROOT="$(prima_resolve_dataset_root "$BASE")"
 CONTAINER_YOLO_DIR="/usr/src/ultralytics/yolo_new"
 IMAGE_LIMIT="${IMAGE_LIMIT:-100}"
 REPEAT_START="${REPEAT_START:-1}"
@@ -25,6 +27,8 @@ echo "mode,workload,repeat,container,exit_status,oom_killed,result_dir" > "$SUMM
   echo "repeat_range=${REPEAT_START}-${REPEAT_END}"
   echo "memory_limit=unlimited"
   echo "image=$IMAGE"
+  echo "dataset_root=$DATASET_ROOT"
+  echo "locale=$LC_ALL"
   nvpmodel -q 2>/dev/null | tr '\n' ' '; echo
 } > "$RESULT_ROOT/experiment_config.txt"
 cat /proc/swaps > "$RESULT_ROOT/swaps_start.txt"
@@ -45,7 +49,9 @@ stop_monitors(){
   MONITOR_PIDS=()
 }
 cleanup_container(){ docker rm -f "$1" >/dev/null 2>&1 || true; }
-trap 'stop_monitors; exit 130' INT TERM
+trap 'stop_monitors; prima_tty_restore; exit 130' INT TERM
+trap 'prima_tty_restore' EXIT
+prima_tty_prepare
 for repeat in $(seq "$REPEAT_START" "$REPEAT_END"); do
   for workload in "${WORKLOADS[@]}"; do
     RUN_DIR="$RESULT_ROOT/$workload/unlimited/run${repeat}"
@@ -126,15 +132,17 @@ CFG
     echo "[DONE] workload=$workload repeat=$repeat exit=$exit_status oom=$oom"
   done
 done
-RESULT_ROOT_PATH="$RESULT_ROOT" python3 - <<'REMOTEPY'
-import csv, pathlib, re, collections, os
+RESULT_ROOT_PATH="$RESULT_ROOT" LOG_FORMATS_DIR="$RUNNER_DIR" python3 - <<'REMOTEPY'
+import csv, pathlib, re, collections, os, sys
+sys.path.insert(0, os.environ['LOG_FORMATS_DIR'])
+from log_formats import normalize_time_prefix
 root=pathlib.Path(os.environ['RESULT_ROOT_PATH'])
 out=root/'organized'; out.mkdir(exist_ok=True)
 workload_map={'classify':'CLS','detect':'DET','pose':'EST','segment':'SEG','obb':'OBB'}
 rows=[]; parse=[]
 pat=re.compile(r'^\d{2}:\d{2}:\d{2}$')
 def parse_line(line):
-    p=line.strip().split()
+    p=normalize_time_prefix(line.strip()).split()
     if len(p)<16 or not pat.match(p[0]): return None
     return {'timestamp':p[0],'uid':p[1],'tgid':p[2],'tid':p[3],'cpu_user_pct':p[4],'cpu_system_pct':p[5],'cpu_guest_pct':p[6],'cpu_wait_pct':p[7],'cpu_total_pct':p[8],'cpu_core':p[9],'minor_faults_per_sec':p[10],'major_faults_per_sec':p[11],'vsz_kb':p[12],'rss_kb':p[13],'memory_pct':p[14],'command':' '.join(p[15:])}
 for pidfile in sorted(root.glob('*/*/run*/python_pid.txt')):

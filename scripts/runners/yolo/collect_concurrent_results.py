@@ -4,6 +4,9 @@ import re
 import sys
 from pathlib import Path
 
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+from log_formats import normalize_time_prefix, parse_inference_line  # noqa: E402
+
 
 ANSI_RE = re.compile(r"\x1b\[[0-9;]*m")
 IMAGE_RE = re.compile(
@@ -42,13 +45,14 @@ def parse_output(path):
     lines = path.read_text(encoding="utf-8", errors="replace").splitlines()
     for line in lines:
         line = ANSI_RE.sub("", line).strip()
-        match = IMAGE_RE.match(line)
-        if match:
+        parsed = parse_inference_line(line)
+        if parsed:
+            image_index, image_count, inference_ms = parsed
             inference_rows.append(
                 {
-                    "image_index": int(match.group("image_index")),
-                    "image_count": int(match.group("image_count")),
-                    "inference_ms": float(match.group("inference_ms")),
+                    "image_index": image_index,
+                    "image_count": image_count,
+                    "inference_ms": inference_ms,
                 }
             )
         elif NUMBER_RE.match(line):
@@ -218,7 +222,7 @@ def main():
             for line_number, raw_line in enumerate(
                 mpstat_path.read_text(encoding="utf-8", errors="replace").splitlines(), 1
             ):
-                parts = raw_line.split()
+                parts = normalize_time_prefix(raw_line).split()
                 if len(parts) != len(names) or not re.match(r"^\d{2}:\d{2}:\d{2}$", parts[0]):
                     continue
                 mpstat_rows.append(
@@ -230,6 +234,7 @@ def main():
             for line_number, raw_line in enumerate(
                 pidstat_path.read_text(encoding="utf-8", errors="replace").splitlines(), 1
             ):
+                raw_line = normalize_time_prefix(raw_line)
                 if not re.match(r"^\d{2}:\d{2}:\d{2}\s+", raw_line):
                     continue
                 pidstat_rows.append(
