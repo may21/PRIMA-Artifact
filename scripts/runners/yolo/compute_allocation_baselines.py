@@ -30,6 +30,9 @@ import sys
 from collections import defaultdict
 from pathlib import Path
 
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+from log_formats import normalize_time_prefix  # noqa: E402
+
 WORKLOADS = ["classify", "detect", "pose", "segment", "obb"]
 LABEL_TO_WORKLOAD = {"CLS": "classify", "DET": "detect", "EST": "pose", "SEG": "segment", "OBB": "obb"}
 WORKLOAD_TO_LABEL = {v: k for k, v in LABEL_TO_WORKLOAD.items()}
@@ -108,7 +111,7 @@ def pidstat_memory_mib(run_dir: Path, statistic: str) -> float | None:
     col_tgid, col_tid, col_mem = 2, 3, 14
     samples = []
     for line in pidstat_file.open(errors="ignore"):
-        parts = line.split()
+        parts = normalize_time_prefix(line).split()
         if not parts:
             continue
         if parts[0] == "#":

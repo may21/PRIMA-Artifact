@@ -1,0 +1,395 @@
+{
+ "_source": "Revised manuscript (second major revision), sections 3 and 5, and data/isolated_memory_sweep_*.csv. Values marked text_* are quoted in the prose; the full per-workload bars of Figures 2, 6 and 7 are not tabulated in the paper.",
+ "tolerance": {
+  "latency_rel": 0.2,
+  "total_time_rel": 0.15,
+  "memory_rel": 0.1,
+  "success_abs_pct": 10.0,
+  "page_fault_rel": 0.3,
+  "gpu_util_abs_pct": 10.0,
+  "overhead_rel": 0.5
+ },
+ "fig2_motivation": {
+  "isolated_mean_ms": {
+   "DET": 26.6,
+   "SEG": 27.0
+  },
+  "ts_mean_ms": {
+   "DET": 54.4,
+   "SEG": 56.0
+  },
+  "ts_sd_ms": {
+   "DET": 117.4,
+   "SEG": 105.4
+  },
+  "mps20_mean_ms": {
+   "CLS": 46.4,
+   "DET": 92.3,
+   "EST": 83.6,
+   "SEG": 93.3,
+   "OBB": 72.5
+  },
+  "mps20_sd_range_ms": [
+   27.0,
+   55.0
+  ],
+  "total_ram_used_gb_concurrent": 7.8
+ },
+ "sec51_concurrent": {
+  "ts_mean_ms": {
+   "EST": 54.1
+  },
+  "prima_ts_mean_ms": {
+   "EST": 27.8
+  },
+  "mps20_mean_ms": {
+   "SEG": 93.3
+  },
+  "prima_mps20_mean_ms": {
+   "SEG": 82.4
+  },
+  "ts_sd_ms": {
+   "CLS": 101.6
+  },
+  "prima_ts_sd_ms": {
+   "CLS": 40.8
+  },
+  "mps20_sd_ms": {
+   "CLS": 37.2
+  },
+  "prima_mps20_sd_ms": {
+   "CLS": 15.6
+  },
+  "obb_page_fault_reduction_pct": {
+   "ts": 23.7,
+   "mps20": 37.9
+  },
+  "gpu_util_median_pct": {
+   "ts_unlimited": 49,
+   "ts_memlimit": 98,
+   "mps20_unlimited": 46,
+   "mps20_memlimit": 97
+  }
+ },
+ "table3_total_time_s": {
+  "ts_unlimited": [
+   211.2,
+   4.4
+  ],
+  "ts_memlimit": [
+   174.6,
+   4.7
+  ],
+  "mps20_unlimited": [
+   176.7,
+   5.9
+  ],
+  "mps20_memlimit": [
+   132.3,
+   2.9
+  ]
+ },
+ "table2_success_pct": {
+  "CLS@0.5": 19.7,
+  "CLS@1.0": 100.0,
+  "CLS@1.5": 100.0,
+  "CLS@2.0": 100.0,
+  "CLS@2.5": 100.0,
+  "DET@0.5": 0.0,
+  "DET@1.0": 100.0,
+  "DET@1.5": 100.0,
+  "DET@2.0": 100.0,
+  "DET@2.5": 100.0,
+  "EST@0.5": 0.0,
+  "EST@1.0": 100.0,
+  "EST@1.5": 100.0,
+  "EST@2.0": 100.0,
+  "EST@2.5": 100.0,
+  "SEG@0.5": 0.0,
+  "SEG@1.0": 100.0,
+  "SEG@1.5": 100.0,
+  "SEG@2.0": 100.0,
+  "SEG@2.5": 100.0,
+  "OBB@0.5": 0.0,
+  "OBB@1.0": 9.3,
+  "OBB@1.5": 48.0,
+  "OBB@2.0": 100.0,
+  "OBB@2.5": 100.0
+ },
+ "sweep_latency": {
+  "CLS@1.0": {
+   "mean_ms": 11.05,
+   "sd_ms": 0.41
+  },
+  "CLS@1.5": {
+   "mean_ms": 11.04,
+   "sd_ms": 0.25
+  },
+  "CLS@2.0": {
+   "mean_ms": 11.04,
+   "sd_ms": 0.21
+  },
+  "CLS@2.5": {
+   "mean_ms": 11.07,
+   "sd_ms": 0.8
+  },
+  "DET@1.0": {
+   "mean_ms": 26.53,
+   "sd_ms": 2.94
+  },
+  "DET@1.5": {
+   "mean_ms": 26.27,
+   "sd_ms": 2.13
+  },
+  "DET@2.0": {
+   "mean_ms": 26.23,
+   "sd_ms": 2.39
+  },
+  "DET@2.5": {
+   "mean_ms": 26.23,
+   "sd_ms": 2.22
+  },
+  "EST@1.0": {
+   "mean_ms": 23.77,
+   "sd_ms": 1.5
+  },
+  "EST@1.5": {
+   "mean_ms": 23.77,
+   "sd_ms": 2.47
+  },
+  "EST@2.0": {
+   "mean_ms": 23.92,
+   "sd_ms": 2.67
+  },
+  "EST@2.5": {
+   "mean_ms": 23.75,
+   "sd_ms": 1.54
+  },
+  "OBB@1.0": {
+   "mean_ms": 21.13,
+   "sd_ms": 0.27
+  },
+  "OBB@1.5": {
+   "mean_ms": 21.13,
+   "sd_ms": 0.66
+  },
+  "OBB@2.0": {
+   "mean_ms": 21.22,
+   "sd_ms": 1.48
+  },
+  "OBB@2.5": {
+   "mean_ms": 21.14,
+   "sd_ms": 0.85
+  },
+  "SEG@1.0": {
+   "mean_ms": 27.44,
+   "sd_ms": 2.88
+  },
+  "SEG@1.5": {
+   "mean_ms": 27.39,
+   "sd_ms": 2.83
+  },
+  "SEG@2.0": {
+   "mean_ms": 27.76,
+   "sd_ms": 2.52
+  },
+  "SEG@2.5": {
+   "mean_ms": 27.67,
+   "sd_ms": 3.9
+  }
+ },
+ "sweep_page_faults_per_sec": {
+  "CLS@0.5": 6118.1,
+  "CLS@1.0": 5370.8,
+  "CLS@1.5": 5475.7,
+  "CLS@2.0": 5526.4,
+  "CLS@2.5": 5423.3,
+  "DET@0.5": 8037.1,
+  "DET@1.0": 6826.0,
+  "DET@1.5": 7057.5,
+  "DET@2.0": 6894.1,
+  "DET@2.5": 6929.7,
+  "EST@0.5": 8068.9,
+  "EST@1.0": 6087.2,
+  "EST@1.5": 6290.7,
+  "EST@2.0": 6255.5,
+  "EST@2.5": 6225.1,
+  "SEG@0.5": 8225.8,
+  "SEG@1.0": 6653.9,
+  "SEG@1.5": 6860.8,
+  "SEG@2.0": 6595.0,
+  "SEG@2.5": 6610.9,
+  "OBB@0.5": 7541.8,
+  "OBB@1.0": 7348.9,
+  "OBB@1.5": 9577.3,
+  "OBB@2.0": 8625.7,
+  "OBB@2.5": 8450.4
+ },
+ "sec52_mps": {
+  "prima_normalized_reduction_pct": {
+   "mps20": [
+    4,
+    12
+   ],
+   "mps50": [
+    14,
+    27
+   ]
+  },
+  "prima_page_fault_reduction_pct": {
+   "mps20": [
+    21,
+    49
+   ],
+   "mps50": [
+    31,
+    39
+   ]
+  },
+  "obb_peak_memory_gb": [
+   2.2,
+   2.5
+  ]
+ },
+ "table7_goodput_ms": {
+  "TS": {
+   "CLS": [
+    17.4,
+    23.7,
+    928.5
+   ],
+   "DET": [
+    30.9,
+    43.2,
+    1003.0
+   ],
+   "EST": [
+    33.1,
+    44.4,
+    1003.9
+   ],
+   "SEG": [
+    35.1,
+    1000.2,
+    1011.5
+   ],
+   "OBB": [
+    22.5,
+    35.8,
+    1150.6
+   ],
+   "Overall": [
+    24.4,
+    44.0,
+    1006.5
+   ]
+  },
+  "PRIMA-TS": {
+   "CLS": [
+    17.5,
+    24.0,
+    329.0
+   ],
+   "DET": [
+    29.5,
+    42.3,
+    51.5
+   ],
+   "EST": [
+    31.9,
+    43.9,
+    53.8
+   ],
+   "SEG": [
+    34.6,
+    50.0,
+    760.5
+   ],
+   "OBB": [
+    22.4,
+    34.6,
+    51.7
+   ],
+   "Overall": [
+    23.8,
+    43.2,
+    58.5
+   ]
+  },
+  "MPS": {
+   "CLS": [
+    47.2,
+    60.4,
+    72.1
+   ],
+   "DET": [
+    106.3,
+    135.6,
+    159.2
+   ],
+   "EST": [
+    111.4,
+    142.9,
+    165.6
+   ],
+   "SEG": [
+    106.7,
+    139.7,
+    163.6
+   ],
+   "OBB": [
+    60.9,
+    127.9,
+    160.6
+   ],
+   "Overall": [
+    93.4,
+    134.1,
+    161.5
+   ]
+  },
+  "PRIMA-MPS": {
+   "CLS": [
+    43.5,
+    50.0,
+    61.8
+   ],
+   "DET": [
+    90.6,
+    119.1,
+    144.6
+   ],
+   "EST": [
+    96.2,
+    127.5,
+    150.3
+   ],
+   "SEG": [
+    91.3,
+    124.6,
+    148.7
+   ],
+   "OBB": [
+    60.8,
+    112.3,
+    145.1
+   ],
+   "Overall": [
+    82.6,
+    118.8,
+    146.0
+   ]
+  }
+ },
+ "table8_clip_actual_mb": {
+  "RN50": 1075,
+  "ViT-B/32": 1092
+ },
+ "fig10_overhead_ms": {
+  "feature_extraction": {
+   "CLS": 29.1
+  },
+  "five_yolo_feature_extraction_total": 177.0,
+  "five_yolo_total_with_rf_and_calculator": 193.0
+ }
+}

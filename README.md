@@ -222,6 +222,28 @@ mean/SD/p50/p99 latency, page faults per second, per-mode elapsed time).
 Set `MODE_LIST="mps20_unlimited mps20_equal mps20_oracle mps20_memlimit"` for
 the MPS counterparts.
 
+### Checking results against the paper
+
+`scripts/analysis/compare_with_paper.py` compares a node's result roots with
+the numbers in the revised manuscript (`configs/paper_reference/revised_manuscript.json`).
+It reads the raw run files, so results organized with older parsers work too.
+Pass only the roots you have:
+
+```bash
+R=$PRIMA_ARTIFACT_ROOT/yolo/results
+python3 scripts/analysis/compare_with_paper.py \
+  --isolated $R/isolated_no_memlimit_100_1 --concurrent $R/concurrent_4mode_1 \
+  --sweep $R/isolated_memory_sweep_1 --mps50 $R/mps50_partitioning_1 \
+  --goodput $PRIMA_ARTIFACT_ROOT/goodput/results/goodput_concurrent_5000x1_15W_1 \
+  --overhead results/prima_overhead --clip $PRIMA_ARTIFACT_ROOT/clip \
+  --output-dir paper_comparison
+```
+
+It writes `paper_comparison.md` and `.csv` with two kinds of rows:
+value checks (measured vs. paper, within the tolerances in the JSON file) and
+claim checks (the qualitative statements of Sections 3 and 5, such as
+"PRIMA-TS lowers the mean latency of every workload").
+
 ## 5. External assets
 
 Large or device-specific assets are excluded from GitHub and prepared with the
