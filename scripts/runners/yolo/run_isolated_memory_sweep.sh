@@ -13,6 +13,7 @@ CONTAINER_YOLO_DIR="/usr/src/ultralytics/yolo_new"
 START_DELAY_SECONDS=7
 PERF_RETRY_SECONDS=10
 IMAGE_LIMIT="${IMAGE_LIMIT:-100}"
+prima_check_image_set "$DATASET_ROOT" "${HOST_YOLO_DIR}/image_lists" "$IMAGE_LIMIT"
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
 read -r -a WORKLOADS <<< "${WORKLOAD_LIST:-classify detect pose segment obb}"
