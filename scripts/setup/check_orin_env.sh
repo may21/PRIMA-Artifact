@@ -39,6 +39,18 @@ for d in expanded_imagenet_images expanded_coco_images expanded_dota_images; do
   n="$(find "${dataset_root}/${d}" -maxdepth 1 -type f 2>/dev/null | wc -l)"
   (( n > 0 )) && ok "${dataset_root}/${d}: ${n} files" || fail "missing images in ${dataset_root}/${d}"
 done
+repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
+for f in classify.py detect.py pose.py segment.py obb.py; do
+  [[ -f "${workload_dir}/${f}" ]] && ! cmp -s "${workload_dir}/${f}" "${repo_root}/workloads/yolo/${f}" \
+    && warn "workload/${f} differs from the paper version in workloads/yolo (scripts/setup/install_workloads.sh)"
+done
+for ds in imagenet coco dota; do
+  list="${repo_root}/workloads/yolo/image_lists/${ds}_100.txt"
+  [[ -f "$list" ]] || continue
+  missing=0
+  while IFS= read -r entry; do [[ -f "${dataset_root}/expanded_${ds}_images/$(basename "$entry")" ]] || missing=$((missing + 1)); done < "$list"
+  (( missing == 0 )) && ok "paper ${ds} image set present" || warn "${missing}/100 paper ${ds} images missing from ${dataset_root}/expanded_${ds}_images"
+done
 for f in "${PRIMA_ARTIFACT_ROOT}"/onnx_cache/yolov8n{-cls,,-pose,-seg,-obb}.onnx; do
   [[ -f "$f" ]] && ok "$(basename "$f")" || warn "missing ${f} (overhead experiment; export_yolo_engines.sh copies it)"
 done

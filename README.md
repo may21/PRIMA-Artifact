@@ -105,13 +105,23 @@ sudo apt install time linux-nvidia-tegra-tools-5.15.0-1030   # /usr/bin/time and
 docker pull ultralytics/ultralytics:8.3.102-jetson-jetpack6
 ./scripts/setup/prepare_goodput_datasets.sh       # 5,000-image sets in $PRIMA_SSD_ROOT
 ./scripts/setup/export_yolo_engines.sh            # .onnx/.engine in yolo/workload, ONNX copy in onnx_cache
-./scripts/setup/prepare_yolo_inputs.sh            # 100-image inputs and image_lists/*_100.txt
 ./scripts/setup/build_clip_image.sh               # clip-full:jetson, CIFAR-100, CLIP weights
 ```
 
-Copy the five workload scripts (`classify.py`, `detect.py`, `pose.py`,
-`segment.py`, `obb.py`) into `$PRIMA_ARTIFACT_ROOT/yolo/workload/`. Their
-interface is described in [docs/workload_interface.md](docs/workload_interface.md).
+The paper's five workload scripts and image lists are in `workloads/yolo/`.
+Install them, and copy the paper's image folders (`expanded_imagenet_images`,
+`expanded_coco_images`, `expanded_dota_images` from orin1's `yolo_new/`; the
+DOTA images must be the full-size originals) into the dataset root before
+preparing the inputs:
+
+```bash
+./scripts/setup/install_workloads.sh
+./scripts/setup/prepare_yolo_inputs.sh            # checks every listed image is present
+```
+
+[docs/workload_interface.md](docs/workload_interface.md) explains why these
+scripts and images matter: the memory pressure the paper measures comes from
+them.
 
 Then verify the node; it lists every missing item:
 
@@ -253,8 +263,8 @@ scripts in Section 3.2:
 
 | Asset | Location | Prepared by |
 |---|---|---|
-| Workload scripts, `.pt`, `.onnx`, `.engine` | `$PRIMA_ARTIFACT_ROOT/yolo/workload` | copied; `export_yolo_engines.sh` |
-| 100-image inputs and image lists | `$PRIMA_ARTIFACT_ROOT/yolo/workload` (or `yolo_runtime`) | `prepare_yolo_inputs.sh` |
+| Workload scripts, `.pt`, `.onnx`, `.engine` | `$PRIMA_ARTIFACT_ROOT/yolo/workload` | `install_workloads.sh`; `export_yolo_engines.sh` |
+| Paper image set (orin1 `yolo_new/expanded_*`) and lists | `$PRIMA_ARTIFACT_ROOT/yolo/workload` (or `yolo_runtime`) | copied; `prepare_yolo_inputs.sh` checks it |
 | Goodput datasets | `$PRIMA_SSD_ROOT/prima_goodput_5000` | `prepare_goodput_datasets.sh` |
 | ONNX files for overhead measurement | `$PRIMA_ARTIFACT_ROOT/onnx_cache` | `export_yolo_engines.sh` |
 | CLIP image, weights and CIFAR-100 | `clip-full:jetson`, `$PRIMA_ARTIFACT_ROOT/clip` | `build_clip_image.sh` |
