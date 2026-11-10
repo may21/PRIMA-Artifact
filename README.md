@@ -252,6 +252,10 @@ python3 scripts/analysis/compare_with_paper.py \
 Explicit result roots for a single set are also accepted (`--isolated`,
 `--concurrent`, `--sweep`, `--mps50`, `--goodput`, `--overhead`, `--clip`).
 
+The reference for Figures 6c, 6d and 7 is the figures' own source data in
+`configs/paper_reference/figures/`; the report also lists where the
+manuscript text disagrees with that data.
+
 It writes `paper_comparison.md` and `.csv` with two kinds of rows:
 value checks (measured vs. paper, within the tolerances in the JSON file) and
 claim checks (the qualitative statements of Sections 3 and 5, such as

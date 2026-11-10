@@ -45,7 +45,7 @@ from types import SimpleNamespace
 
 REPO = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(REPO / "scripts" / "runners" / "yolo"))
-from log_formats import parse_inference_line  # noqa: E402
+from log_formats import normalize_time_prefix, parse_inference_line  # noqa: E402
 
 WORKLOADS = ["CLS", "DET", "EST", "SEG", "OBB"]
 LABEL = {"classify": "CLS", "cls": "CLS", "detect": "DET", "det": "DET", "pose": "EST", "est": "EST",
@@ -136,9 +136,38 @@ def batch_seconds(time_csv: Path):
 
 
 # ----------------------------------------------------------------- loaders
+def pidstat_peak_gb(pidstat: Path, pid_file: Path):
+    """Peak per-process memory as %MEM * 8 GB / 100 (the paper's pidstat conversion)."""
+    if not pidstat.exists() or not pid_file.exists():
+        return None
+    pid_text = pid_file.read_text().split()
+    if not pid_text:
+        return None
+    pid, peak = pid_text[0], None
+    col_tgid, col_tid, col_mem = 2, 3, 14
+    for line in pidstat.read_text(errors="replace").splitlines():
+        parts = normalize_time_prefix(line).split()
+        if not parts:
+            continue
+        if parts[0] == "#" and "%MEM" in parts and "TGID" in parts:
+            header = parts[1:]
+            col_tgid, col_mem = header.index("TGID"), header.index("%MEM")
+            col_tid = header.index("TID") if "TID" in header else None
+            continue
+        if len(parts) <= col_mem or parts[col_tgid] != pid or (col_tid is not None and parts[col_tid] != "-"):
+            continue
+        try:
+            value = float(parts[col_mem]) * 8 / 100
+        except ValueError:
+            continue
+        peak = value if peak is None else max(peak, value)
+    return peak
+
+
 def load_concurrent(root: Path):
     """{mode: {"lat": {wl: [...]}, "pf": {wl: [...]}, "gpu": [...], "ram": [...], "batch": [...]}}"""
     data = defaultdict(lambda: {"lat": defaultdict(list), "sd_runs": defaultdict(list), "pf": defaultdict(list),
+                                "pf100": defaultdict(list), "mem": defaultdict(list),
                                 "gpu": [], "ram": [], "batch": []})
     for run_dir in sorted(root.glob("*/run*")):
         if not run_dir.is_dir():
@@ -153,7 +182,13 @@ def load_concurrent(root: Path):
             d["lat"][wl].extend(values)
             if len(values) > 1:
                 d["sd_runs"][wl].append(statistics.pstdev(values))
-            d["pf"][wl].extend(page_faults_per_sec(wl_dir / "perf.csv"))
+            faults = page_faults_per_sec(wl_dir / "perf.csv")
+            d["pf"][wl].extend(faults)
+            if faults:
+                d["pf100"][wl].append(statistics.fmean(faults[:100]))
+            peak = pidstat_peak_gb(run_dir / "system_pidstat.txt", wl_dir / "python_pid.txt")
+            if peak is not None:
+                d["mem"][wl].append(peak)
         gpu, ram = tegrastats(run_dir / "system_tegrastats.txt")
         d["gpu"].extend(gpu)
         d["ram"].extend(ram)
@@ -232,6 +267,51 @@ def load_goodput(root: Path):
             except (KeyError, ValueError):
                 pass
     return lat
+
+
+# ----------------------------------------------------------------- paper figure data
+FIG_MODE = {"TS": "ts_unlimited", "PRIMA-TS": "ts_memlimit", "MPS": "mps20_unlimited", "PRIMA-MPS": "mps20_memlimit"}
+FIG7_MODE = {"MPS-2": "mps20_unlimited", "PRIMA-2": "mps20_memlimit", "MPS-4": "mps50_unlimited",
+             "PRIMA-4": "mps50_memlimit", "MPS-8": "mps100_unlimited", "PRIMA-8": "mps100_memlimit"}
+
+
+def load_figures(folder: Path):
+    """Source data of Figures 6c, 6d and 7 (configs/paper_reference/figures)."""
+    if not folder.is_dir():
+        return {}
+
+    def rows(name):
+        path = folder / name
+        return list(csv.reader(path.open())) if path.exists() else []
+
+    figs = {}
+    r = rows("fig6c_page_faults_per_sec_series.csv")
+    if r:
+        series = defaultdict(lambda: defaultdict(list))
+        for row in r[1:]:
+            for mode, value in zip(r[0][1:], row[1:]):
+                if value.strip():
+                    series[mode][row[0]].append(float(value))
+        figs["6c"] = {mode: {wl: statistics.fmean(v) for wl, v in wls.items()} for mode, wls in series.items()}
+    r = rows("fig6d_gpu_utilization_series.csv")
+    if r:
+        cols = defaultdict(list)
+        for row in r[1:]:
+            for mode, value in zip(r[0][1:], row[1:]):
+                if value.strip():
+                    cols[mode].append(float(value))
+        figs["6d"] = {mode: {"median": statistics.median(v), "mean": statistics.fmean(v), "samples": len(v)} for mode, v in cols.items()}
+    for key, name, stride in [("7a", "fig7a_normalized_inference_time.csv", 1), ("7b", "fig7b_peak_memory_gb.csv", 1),
+                              ("7c", "fig7c_page_faults_mean_sd.csv", 2)]:
+        r = rows(name)
+        if r:
+            configs = r[0][1::stride]
+            figs[key] = {cfg: {row[0]: float(row[1 + i * stride]) for row in r[1:]} for i, cfg in enumerate(configs)}
+    return figs
+
+
+def paper_status(holds):
+    return "supported by the paper's own data" if holds else "NOT supported by the paper's own data"
 
 
 # ----------------------------------------------------------------- report
@@ -336,15 +416,20 @@ def evaluate(ref, paths) -> "Report":
         for mode, (p, _) in ref["table3_total_time_s"].items():
             rep.value("Table 3", "total time for 100 images (s)", p, mean(conc.get(mode, {}).get("batch", [])) if mode in conc else None,
                       "total_time_rel", mode=MODE_NAME[mode])
-        for mode, p in f51["gpu_util_median_pct"].items():
+        figs = paths.figures or {}
+        for label, mode in FIG_MODE.items():
+            paper = figs.get("6d", {}).get(label)
             gpu = conc.get(mode, {}).get("gpu", []) if mode in conc else []
-            rep.value("Fig 6d", "median GPU utilization (%)", p, statistics.median(gpu) if gpu else None,
-                      "gpu_util_abs_pct", mode=MODE_NAME[mode], absolute=True)
-        for gpu_mode, base, prima in [("ts", "ts_unlimited", "ts_memlimit"), ("mps20", "mps20_unlimited", "mps20_memlimit")]:
-            b, t = pf.get(base, {}).get("OBB"), pf.get(prima, {}).get("OBB")
-            red = (b - t) / b * 100 if b and t is not None else None
-            rep.value("Sec 5.1", "OBB page-fault reduction (%)", f51["obb_page_fault_reduction_pct"][gpu_mode], red,
-                      "page_fault_rel", "OBB", MODE_NAME[prima])
+            if paper:
+                rep.value("Fig 6d", "median GPU utilization (%)", paper["median"], statistics.median(gpu) if gpu else None,
+                          "gpu_util_abs_pct", mode=label, absolute=True)
+                rep.value("Fig 6d", "mean GPU utilization (%)", round(paper["mean"], 1), statistics.fmean(gpu) if gpu else None,
+                          "gpu_util_abs_pct", mode=label, absolute=True)
+            for wl in WORKLOADS:
+                paper_pf = figs.get("6c", {}).get(label, {}).get(wl)
+                if paper_pf is not None:
+                    measured = mean(conc[mode]["pf100"].get(wl, [])) if mode in conc else None
+                    rep.value("Fig 6c", "page faults/s, first 100 s", round(paper_pf), measured, "page_fault_rel", wl, label)
         ram = conc.get("ts_unlimited", {}).get("ram", []) if "ts_unlimited" in conc else []
         rep.value("Fig 2b", "peak total RAM under TS (GB)", f2["total_ram_used_gb_concurrent"],
                   max(ram) / 1024 if ram else None, "memory_rel", mode="TS")
@@ -363,13 +448,26 @@ def evaluate(ref, paths) -> "Report":
         compare_all_lower(rep, "Sec 5.1", "PRIMA-MPS lowers mean latency of every workload", m.get("mps20_unlimited", {}), m.get("mps20_memlimit", {}), labels=("MPS", "PRIMA-MPS"))
         compare_all_lower(rep, "Sec 5.1", "PRIMA-TS lowers latency SD of every workload", s.get("ts_unlimited", {}), s.get("ts_memlimit", {}), labels=("TS", "PRIMA-TS"))
         compare_all_lower(rep, "Sec 5.1", "PRIMA-MPS lowers latency SD of every workload", s.get("mps20_unlimited", {}), s.get("mps20_memlimit", {}), labels=("MPS", "PRIMA-MPS"))
-        compare_all_lower(rep, "Fig 6c", "PRIMA-TS lowers page faults/s of every workload", pf.get("ts_unlimited", {}), pf.get("ts_memlimit", {}), "PF/s", ("TS", "PRIMA-TS"))
-        compare_all_lower(rep, "Fig 6c", "PRIMA-MPS lowers page faults/s of every workload", pf.get("mps20_unlimited", {}), pf.get("mps20_memlimit", {}), "PF/s", ("MPS", "PRIMA-MPS"))
+        for base_label, prima_label in [("TS", "PRIMA-TS"), ("MPS", "PRIMA-MPS")]:
+            fig = figs.get("6c", {})
+            note = ""
+            if base_label in fig and prima_label in fig:
+                holds = all(fig[prima_label][wl] < fig[base_label][wl] for wl in WORKLOADS)
+                note = f"{paper_status(holds)}: " + ", ".join(
+                    f"{wl} {fig[base_label][wl]:.0f} vs {fig[prima_label][wl]:.0f}" for wl in WORKLOADS)
+            compare_all_lower(rep, "Fig 6c", f"{prima_label} lowers page faults/s of every workload",
+                              pf.get(FIG_MODE[base_label], {}), pf.get(FIG_MODE[prima_label], {}), "PF/s", (base_label, prima_label))
+            if note:
+                rep.rows[-1]["note"] += f" | paper Fig 6c: {note}"
         for base, prima in [("ts_unlimited", "ts_memlimit"), ("mps20_unlimited", "mps20_memlimit")]:
             gb, gp = conc.get(base, {}).get("gpu") if base in conc else None, conc.get(prima, {}).get("gpu") if prima in conc else None
+            fig = figs.get("6d", {})
+            fb, fp = fig.get(MODE_NAME[base]), fig.get(MODE_NAME[prima])
+            paper_note = (f" | paper Fig 6d: {paper_status(fp['median'] > fb['median'])} ({fb['median']:.0f}% vs {fp['median']:.0f}%)"
+                          if fb and fp else "")
             if gb and gp:
                 rep.claim("Fig 6d", f"{MODE_NAME[prima]} raises median GPU utilization", statistics.median(gp) > statistics.median(gb),
-                          f"{statistics.median(gb):.0f}% → {statistics.median(gp):.0f}%")
+                          f"{statistics.median(gb):.0f}% vs {statistics.median(gp):.0f}%" + paper_note)
             bb, bp = (mean(conc[base]["batch"]) if base in conc else None), (mean(conc[prima]["batch"]) if prima in conc else None)
             if bb and bp:
                 rep.claim("Table 3", f"{MODE_NAME[prima]} shortens total time", bp < bb, f"{bb:.1f} s → {bp:.1f} s ({(bb - bp) / bb * 100:.0f}% less)")
@@ -404,29 +502,61 @@ def evaluate(ref, paths) -> "Report":
             rep.claim("Sec 3", "Once demand is met, isolated latency is flat across 1.0-2.5 GB (max/min < 1.10)",
                       all(r < 1.10 for _, r in flat), "; ".join(f"{wl} ×{r:.2f}" for wl, r in flat))
 
+    # Figure 7: SM sensitivity (MPS-2 from the concurrent folders, MPS-4 from the
+    # MPS-50 folders, MPS-8 from mps100_* modes if a node has them).
+    figs = paths.figures or {}
+    sm_data = dict(conc) if conc else {}
     if paths.mps50:
-        m50 = load_concurrent(paths.mps50)
-        if not iso_mean:
-            rep.claim("Sec 5.2", "PRIMA gain grows from 2 to 4 SMs", None, "needs --isolated for normalization")
-        else:
-            def reductions(data, base, prima):
-                out = {}
-                for wl in WORKLOADS:
-                    b, t = mean(data.get(base, {}).get("lat", {}).get(wl, [])), mean(data.get(prima, {}).get("lat", {}).get(wl, []))
-                    if b and t:
-                        out[wl] = (b - t) / b * 100
-                return out
-            r2 = reductions(conc, "mps20_unlimited", "mps20_memlimit") if conc else {}
-            r4 = reductions(m50, "mps50_unlimited", "mps50_memlimit")
-            for label, r, key in [("MPS-2", r2, "mps20"), ("MPS-4", r4, "mps50")]:
-                lo, hi = ref["sec52_mps"]["prima_normalized_reduction_pct"][key]
-                if r:
-                    rep.claim("Sec 5.2", f"PRIMA lowers {label} latency by {lo}-{hi}% per workload",
-                              all(lo * 0.5 <= v <= hi * 1.5 for v in r.values()),
-                              "; ".join(f"{wl} {v:.0f}%" for wl, v in r.items()) + " (pass band: half the low end to 1.5× the high end)")
-            if r2 and r4:
-                rep.claim("Sec 5.2", "PRIMA gain is larger at 4 SMs than at 2 SMs", mean(list(r4.values())) > mean(list(r2.values())),
-                          f"mean reduction {mean(list(r2.values())):.0f}% → {mean(list(r4.values())):.0f}%")
+        sm_data.update(load_concurrent(paths.mps50))
+    if any(mode in sm_data for mode in FIG7_MODE.values()):
+        for cfg, mode in FIG7_MODE.items():
+            d = sm_data.get(mode)
+            for wl in WORKLOADS:
+                lat = mean(d["lat"].get(wl, [])) if d else None
+                if "7a" in figs:
+                    norm = lat / iso_mean[wl] if lat and iso_mean.get(wl) else None
+                    rep.value("Fig 7a", "inference time / isolated", figs["7a"][cfg][wl], norm, "latency_rel", wl, cfg,
+                              note="" if iso_mean else "needs --isolated")
+                if "7b" in figs:
+                    rep.value("Fig 7b", "peak memory (GB, pidstat)", figs["7b"][cfg][wl],
+                              max(d["mem"][wl]) if d and d["mem"].get(wl) else None, "memory_rel", wl, cfg)
+                if "7c" in figs:
+                    rep.value("Fig 7c", "page faults/s", round(figs["7c"][cfg][wl]),
+                              mean(d["pf"].get(wl, [])) if d else None, "page_fault_rel", wl, cfg)
+
+        def reduction(table, base, prima):
+            out = {}
+            for wl in WORKLOADS:
+                b, t = table.get(base, {}).get(wl), table.get(prima, {}).get(wl)
+                if b and t is not None:
+                    out[wl] = (b - t) / b * 100
+            return out
+
+        measured_lat = {cfg: {wl: mean(sm_data[m]["lat"].get(wl, [])) for wl in WORKLOADS}
+                        for cfg, m in FIG7_MODE.items() if m in sm_data}
+        measured_pf = {cfg: {wl: mean(sm_data[m]["pf"].get(wl, [])) for wl in WORKLOADS}
+                       for cfg, m in FIG7_MODE.items() if m in sm_data}
+        gains = {}
+        for sm in ["2", "4", "8"]:
+            base, prima = f"MPS-{sm}", f"PRIMA-{sm}"
+            for metric, table, fig_key in [("latency", measured_lat, "7a"), ("page faults", measured_pf, "7c")]:
+                measured = reduction(table, base, prima)
+                paper = reduction(figs.get(fig_key, {}), base, prima)
+                if metric == "latency" and measured:
+                    gains[sm] = mean(list(measured.values()))
+                if not measured:
+                    continue
+                if paper:
+                    lo, hi = min(paper.values()), max(paper.values())
+                    holds = all(lo * 0.5 <= v <= hi * 1.5 for v in measured.values())
+                    band = f"paper {lo:.0f}-{hi:.0f}%, pass band half the low end to 1.5x the high end"
+                else:
+                    holds, band = all(v > 0 for v in measured.values()), "no figure data"
+                rep.claim("Sec 5.2", f"PRIMA lowers MPS-{sm} {metric} for every workload as in Fig 7",
+                          holds, "; ".join(f"{wl} {v:.0f}%" for wl, v in measured.items()) + f" ({band})")
+        if "2" in gains and "4" in gains:
+            rep.claim("Sec 5.2", "PRIMA latency gain is larger at 4 SMs than at 2 SMs", gains["4"] > gains["2"],
+                      f"mean reduction {gains['2']:.0f}% at 2 SMs vs {gains['4']:.0f}% at 4 SMs")
 
     if paths.goodput:
         gp = load_goodput(paths.goodput)
@@ -527,7 +657,7 @@ def load_concurrent_many(roots):
 def discover(artifact_root: Path) -> SimpleNamespace:
     results = artifact_root / "yolo" / "results"
     paths = SimpleNamespace(isolated=None, concurrent=None, sweep=None, mps50=None,
-                            goodput=None, overhead=None, clip=None, concurrent_sources={})
+                            goodput=None, overhead=None, clip=None, concurrent_sources={}, figures=None)
     if results.is_dir():
         paths.isolated = latest_with_data(results.glob("isolated_no_memlimit_*"), has_inference)
         conc = [p for p in results.glob("concurrent_4mode_*") if p.is_dir()]
@@ -562,7 +692,36 @@ def describe_inputs(name: str, paths) -> list[str]:
 
 
 # ----------------------------------------------------------------- combined report
-def write_combined(reports: dict, inputs: dict, out_dir: Path) -> str:
+def paper_consistency(ref, figs) -> list[str]:
+    """Statements in the manuscript text compared with the paper's own figure data."""
+    out = []
+    text = ref["sec51_concurrent"]
+    if "6d" in figs:
+        for label, key in [("TS", "ts_unlimited"), ("PRIMA-TS", "ts_memlimit"), ("MPS", "mps20_unlimited"), ("PRIMA-MPS", "mps20_memlimit")]:
+            t, f = text["gpu_util_median_pct"][key], figs["6d"][label]["median"]
+            out.append(f"| Fig 6d | median GPU utilization, {label} | {t}% | {f:.0f}% | {'agrees' if abs(t - f) <= 5 else '**differs**'} |")
+    if "6c" in figs:
+        for label, base, prima in [("TS", "TS", "PRIMA-TS"), ("MPS", "MPS", "PRIMA-MPS")]:
+            b, p = figs["6c"][base]["OBB"], figs["6c"][prima]["OBB"]
+            t = text["obb_page_fault_reduction_pct"]["ts" if label == "TS" else "mps20"]
+            f = (b - p) / b * 100
+            out.append(f"| Fig 6c | OBB page-fault reduction, {prima} vs {base} | {t}% | {f:.1f}% | {'agrees' if abs(t - f) <= 2 else '**differs**'} |")
+            worse = [wl for wl in WORKLOADS if figs["6c"][prima][wl] >= figs["6c"][base][wl]]
+            out.append(f"| Fig 6c | {prima} lowers page faults of every workload | yes | "
+                       f"{'yes' if not worse else 'no: higher for ' + ', '.join(worse)} | {'agrees' if not worse else '**differs**'} |")
+    for key, metric in [("7a", "latency"), ("7c", "page faults")]:
+        if key in figs:
+            for sm, text_range in zip(["2", "4", "8"], {"7a": [(4, 12), (14, 27), (None, 41)],
+                                                         "7c": [(21, 49), (31, 39), (10, 31)]}[key]):
+                vals = [(figs[key][f"MPS-{sm}"][wl] - figs[key][f"PRIMA-{sm}"][wl]) / figs[key][f"MPS-{sm}"][wl] * 100 for wl in WORKLOADS]
+                lo, hi = min(vals), max(vals)
+                tl = f"{text_range[0]}-{text_range[1]}%" if text_range[0] is not None else f"up to {text_range[1]}%"
+                ok = (text_range[0] is None or abs(round(lo) - text_range[0]) <= 1) and abs(round(hi) - text_range[1]) <= 1
+                out.append(f"| Fig 7 | PRIMA {metric} reduction at {sm} SMs | {tl} | {lo:.1f}-{hi:.1f}% | {'agrees' if ok else '**differs**'} |")
+    return out
+
+
+def write_combined(reports: dict, inputs: dict, out_dir: Path, consistency=None) -> str:
     out_dir.mkdir(parents=True, exist_ok=True)
     names = list(reports)
     keyed = {}
@@ -586,6 +745,10 @@ def write_combined(reports: dict, inputs: dict, out_dir: Path) -> str:
     lines = ["# Comparison with the revised paper", "", "## Inputs", ""]
     for name in names:
         lines += inputs[name]
+    if consistency:
+        lines += ["## Paper text vs. paper figure data", "",
+                  "Independent of any node: what the manuscript text states against the data plotted in its figures.", "",
+                  "| Figure | Statement | Text | Figure data | Verdict |", "|---|---|---|---|---|"] + consistency + [""]
     lines += ["## Summary", "", "| Set | " + " | ".join(["HOLDS", "FAILS", "OK", "DIFF", "MISSING"]) + " |", "|---" * 6 + "|"]
     for name, rep in reports.items():
         counts = defaultdict(int)
@@ -630,6 +793,8 @@ def main():
     for name in ["isolated", "concurrent", "sweep", "mps50", "goodput", "overhead", "clip"]:
         ap.add_argument(f"--{name}", type=Path, help=f"explicit {name} result root (single-set mode)")
     ap.add_argument("--reference", type=Path, default=REPO / "configs" / "paper_reference" / "revised_manuscript.json")
+    ap.add_argument("--figures", type=Path, default=REPO / "configs" / "paper_reference" / "figures",
+                    help="source data of the paper's Figures 6c, 6d and 7")
     ap.add_argument("--output-dir", type=Path, default=Path("paper_comparison"))
     args = ap.parse_args()
     ref = json.loads(args.reference.read_text())
@@ -649,11 +814,13 @@ def main():
     if not sets:
         ap.error("give --set NAME=ARTIFACT_ROOT (repeatable) or explicit result roots")
 
+    figures = load_figures(args.figures)
     reports, inputs = {}, {}
     for name, paths in sets.items():
+        paths.figures = figures
         reports[name] = evaluate(ref, paths)
         inputs[name] = describe_inputs(name, paths)
-    text = write_combined(reports, inputs, args.output_dir)
+    text = write_combined(reports, inputs, args.output_dir, paper_consistency(ref, figures))
     print(text)
     print(f"[written] {args.output_dir / 'paper_comparison.md'} and .csv")
 
