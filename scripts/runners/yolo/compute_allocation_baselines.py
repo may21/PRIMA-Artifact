@@ -25,6 +25,7 @@ from __future__ import annotations
 import argparse
 import csv
 import json
+import re
 import sys
 from collections import defaultdict
 from pathlib import Path
@@ -67,19 +68,111 @@ def parse_args() -> argparse.Namespace:
     return parser.parse_args()
 
 
-def read_isolated_peaks(root: Path, statistic: str) -> dict[str, float]:
-    summary = root / "organized" / "isolated_no_memlimit_pidstat_memory_peak_summary.csv"
-    if not summary.exists():
-        raise SystemExit(f"missing {summary}; run run_isolated_baseline.sh first")
-    column = {"max": "max_pidstat_memory_gb_8gb", "avg": "avg_pidstat_memory_gb_8gb"}[statistic]
-    values: dict[str, list[float]] = defaultdict(list)
-    with summary.open(newline="", encoding="utf-8") as stream:
+PIDSTAT_TIME_RE = re.compile(r"^\d{2}:\d{2}:\d{2}$")
+
+
+def workload_from_path(path: Path) -> str | None:
+    for part in path.parts:
+        if part in WORKLOADS:
+            return part
+        if part.upper() in LABEL_TO_WORKLOAD:
+            return LABEL_TO_WORKLOAD[part.upper()]
+    return None
+
+
+def pidstat_memory_mib(run_dir: Path, statistic: str) -> float | None:
+    """Per-run memory from pidstat (memory_pct * 8 GB), as in Figure 2(c)."""
+    pid_file = run_dir / "python_pid.txt"
+    pidstat_file = run_dir / "system_pidstat.txt"
+    if not pid_file.exists() or not pidstat_file.exists():
+        return None
+    pid = pid_file.read_text().split()[0]
+    samples = []
+    for line in pidstat_file.open(errors="ignore"):
+        parts = line.split()
+        # pidstat -h -r -u -I -t 1: time uid tgid tid %usr %system %guest %wait %CPU CPU minflt/s majflt/s VSZ RSS %MEM command
+        if len(parts) < 16 or not PIDSTAT_TIME_RE.match(parts[0]):
+            continue
+        if parts[2] != pid or parts[3] != "-":
+            continue
+        try:
+            samples.append(float(parts[14]) * 8 / 100 * MIB_PER_GB)
+        except ValueError:
+            continue
+    if not samples:
+        return None
+    return max(samples) if statistic == "max" else sum(samples) / len(samples)
+
+
+def cgroup_memory_mib(run_dir: Path, statistic: str) -> float | None:
+    """Fallback: container cgroup memory.current/peak sampled by the runner."""
+    cgroup_file = run_dir / "cgroup_memory.csv"
+    if not cgroup_file.exists():
+        return None
+    current, peak = [], []
+    with cgroup_file.open(newline="", encoding="utf-8") as stream:
         for row in csv.DictReader(stream):
-            workload = LABEL_TO_WORKLOAD.get(row["workload"], row["workload"])
-            values[workload].append(float(row[column]) * MIB_PER_GB)
+            try:
+                current.append(int(row.get("memory_current_bytes") or 0))
+            except ValueError:
+                pass
+            try:
+                peak.append(int(row.get("memory_peak_bytes") or 0))
+            except ValueError:
+                pass
+    if statistic == "max":
+        value = max(peak) if any(peak) else (max(current) if current else 0)
+    else:
+        value = sum(current) / len(current) if current else 0
+    return value / 1024 / 1024 if value else None
+
+
+def read_isolated_peaks(root: Path, statistic: str) -> dict[str, float]:
+    """MM_i from an isolated-baseline result root.
+
+    Prefers organized/isolated_no_memlimit_pidstat_memory_peak_summary.csv;
+    otherwise scans raw run directories (<root>/**/run*/) for pidstat, and
+    finally for cgroup memory samples.
+    """
+    values: dict[str, list[float]] = defaultdict(list)
+    summary = root / "organized" / "isolated_no_memlimit_pidstat_memory_peak_summary.csv"
+    if summary.exists():
+        column = {"max": "max_pidstat_memory_gb_8gb", "avg": "avg_pidstat_memory_gb_8gb"}[statistic]
+        with summary.open(newline="", encoding="utf-8") as stream:
+            for row in csv.DictReader(stream):
+                workload = LABEL_TO_WORKLOAD.get(row["workload"], row["workload"])
+                values[workload].append(float(row[column]) * MIB_PER_GB)
+        source = "organized summary"
+    else:
+        run_dirs = sorted(p for p in root.rglob("run*") if p.is_dir() and re.fullmatch(r"run\d+", p.name))
+        if not run_dirs:
+            raise SystemExit(f"no organized summary and no run*/ directories under {root}")
+        used = {"pidstat": 0, "cgroup": 0}
+        for run_dir in run_dirs:
+            workload = workload_from_path(run_dir.relative_to(root))
+            if workload is None:
+                continue
+            value = pidstat_memory_mib(run_dir, statistic)
+            if value is not None:
+                used["pidstat"] += 1
+            else:
+                value = cgroup_memory_mib(run_dir, statistic)
+                if value is not None:
+                    used["cgroup"] += 1
+            if value is not None:
+                values[workload].append(value)
+        source = f"raw runs (pidstat={used['pidstat']}, cgroup={used['cgroup']})"
+        print(f"[INFO] organized summary missing; derived MM_i from {source}", file=sys.stderr)
     missing = [w for w in WORKLOADS if w not in values]
     if missing:
-        raise SystemExit(f"isolated results lack workloads: {missing}")
+        raise SystemExit(
+            f"isolated results lack workloads {missing} under {root}; "
+            "expected organized/isolated_no_memlimit_pidstat_memory_peak_summary.csv or "
+            "<workload>/.../run*/{python_pid.txt,system_pidstat.txt|cgroup_memory.csv}. "
+            "Alternatively pass --measured."
+        )
+    for w in WORKLOADS:
+        print(f"[INFO] {WORKLOAD_TO_LABEL[w]}: {len(values[w])} run(s), {statistic} = {sum(values[w]) / len(values[w]):.1f} MiB", file=sys.stderr)
     return {w: sum(v) / len(v) for w, v in values.items()}
 
 
