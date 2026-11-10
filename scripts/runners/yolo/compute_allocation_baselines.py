@@ -68,35 +68,63 @@ def parse_args() -> argparse.Namespace:
     return parser.parse_args()
 
 
-PIDSTAT_TIME_RE = re.compile(r"^\d{2}:\d{2}:\d{2}$")
+PIDSTAT_TIME_RE = re.compile(r"^(\d{2}:\d{2}:\d{2}|\d{9,11})$")  # HH:MM:SS or epoch (pidstat -h)
+WORKLOAD_ALIASES = {
+    "classify": "classify", "cls": "classify",
+    "detect": "detect", "det": "detect",
+    "pose": "pose", "est": "pose",
+    "segment": "segment", "seg": "segment",
+    "obb": "obb",
+}
 
 
 def workload_from_path(path: Path) -> str | None:
+    """Identify the workload from any path component, e.g. 'classify', 'CLS',
+    'isolated-nomem-classify-r1' or 'detect_unlimited'."""
     for part in path.parts:
-        if part in WORKLOADS:
-            return part
-        if part.upper() in LABEL_TO_WORKLOAD:
-            return LABEL_TO_WORKLOAD[part.upper()]
+        lowered = part.lower()
+        if lowered in WORKLOAD_ALIASES:
+            return WORKLOAD_ALIASES[lowered]
+        for token in re.split(r"[^a-z0-9]+", lowered):
+            if token in WORKLOAD_ALIASES:
+                return WORKLOAD_ALIASES[token]
     return None
 
 
 def pidstat_memory_mib(run_dir: Path, statistic: str) -> float | None:
-    """Per-run memory from pidstat (memory_pct * 8 GB), as in Figure 2(c)."""
+    """Per-run memory from pidstat (memory_pct * 8 GB), as in Figure 2(c).
+
+    Column positions are taken from the pidstat '# Time UID TGID TID ... %MEM'
+    header when present, so different sysstat versions are handled.
+    """
     pid_file = run_dir / "python_pid.txt"
     pidstat_file = run_dir / "system_pidstat.txt"
     if not pid_file.exists() or not pidstat_file.exists():
         return None
-    pid = pid_file.read_text().split()[0]
+    pid_text = pid_file.read_text().split()
+    if not pid_text:
+        return None
+    pid = pid_text[0]
+    col_tgid, col_tid, col_mem = 2, 3, 14
     samples = []
     for line in pidstat_file.open(errors="ignore"):
         parts = line.split()
-        # pidstat -h -r -u -I -t 1: time uid tgid tid %usr %system %guest %wait %CPU CPU minflt/s majflt/s VSZ RSS %MEM command
-        if len(parts) < 16 or not PIDSTAT_TIME_RE.match(parts[0]):
+        if not parts:
             continue
-        if parts[2] != pid or parts[3] != "-":
+        if parts[0] == "#":
+            header = parts[1:]
+            if "%MEM" in header and "TGID" in header:
+                col_tgid, col_mem = header.index("TGID"), header.index("%MEM")
+                col_tid = header.index("TID") if "TID" in header else None
+            continue
+        if not PIDSTAT_TIME_RE.match(parts[0]) or len(parts) <= col_mem:
+            continue
+        if parts[col_tgid] != pid:
+            continue
+        if col_tid is not None and parts[col_tid] != "-":
             continue
         try:
-            samples.append(float(parts[14]) * 8 / 100 * MIB_PER_GB)
+            samples.append(float(parts[col_mem]) * 8 / 100 * MIB_PER_GB)
         except ValueError:
             continue
     if not samples:
@@ -150,9 +178,12 @@ def read_isolated_peaks(root: Path, statistic: str) -> dict[str, float]:
         if not run_dirs:
             raise SystemExit(f"no organized summary and no run*/ directories under {root}")
         used = {"pidstat": 0, "cgroup": 0}
+        diagnostics = []
         for run_dir in run_dirs:
-            workload = workload_from_path(run_dir.relative_to(root))
+            rel = run_dir.relative_to(root)
+            workload = workload_from_path(rel)
             if workload is None:
+                diagnostics.append(f"  {rel}: workload not recognised from path")
                 continue
             value = pidstat_memory_mib(run_dir, statistic)
             if value is not None:
@@ -163,6 +194,12 @@ def read_isolated_peaks(root: Path, statistic: str) -> dict[str, float]:
                     used["cgroup"] += 1
             if value is not None:
                 values[workload].append(value)
+            else:
+                present = sorted(p.name for p in run_dir.iterdir())[:12]
+                diagnostics.append(f"  {rel} ({workload}): no usable pidstat/cgroup memory; files={present}")
+        if diagnostics:
+            print("[WARN] skipped run directories:", file=sys.stderr)
+            print("\n".join(diagnostics[:30]), file=sys.stderr)
         source = f"raw runs (pidstat={used['pidstat']}, cgroup={used['cgroup']})"
         print(f"[INFO] organized summary missing; derived MM_i from {source}", file=sys.stderr)
     missing = [w for w in WORKLOADS if w not in values]
