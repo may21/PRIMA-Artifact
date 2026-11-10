@@ -1,17 +1,22 @@
 #!/usr/bin/env python3
-"""Compare a node's experiment results with the values in the revised paper.
+"""Compare one or more nodes' experiment results with the revised paper.
 
-Every input is optional; pass the result roots you have:
+Whole artifact roots, side by side (result folders are found automatically:
+for each experiment the newest numbered folder that contains data, and for
+the concurrent experiment the newest folder per mode):
 
   python3 scripts/analysis/compare_with_paper.py \
-    --isolated   $R/isolated_no_memlimit_100_1 \
-    --concurrent $R/concurrent_4mode_1 \
-    --sweep      $R/isolated_memory_sweep_1 \
-    --mps50      $R/mps50_partitioning_1 \
-    --goodput    $PRIMA_ARTIFACT_ROOT/goodput/results/goodput_concurrent_5000x1_15W_1 \
-    --overhead   results/prima_overhead \
-    --clip       $PRIMA_ARTIFACT_ROOT/clip \
+    --set Prima=/home/orin/Prima/prima_artifacts \
+    --set prima_test=/home/orin/prima_test/prima_artifacts \
     --output-dir paper_comparison
+
+Or explicit result roots for a single set (every flag optional):
+
+  python3 scripts/analysis/compare_with_paper.py \
+    --isolated $R/isolated_no_memlimit_100_1 --concurrent $R/concurrent_4mode_1 \
+    --sweep $R/isolated_memory_sweep_100_1 --mps50 $R/mps50_partitioning_1 \
+    --goodput $PRIMA_ARTIFACT_ROOT/goodput/results/goodput_concurrent_5000x1_15W_1 \
+    --overhead results/prima_overhead --clip $PRIMA_ARTIFACT_ROOT/clip
 
 The script reads the raw run files (output.txt, perf.csv, time.csv,
 system_tegrastats.txt, inference_latency.csv), not the organized CSVs, so
@@ -36,6 +41,7 @@ import statistics
 import sys
 from collections import defaultdict
 from pathlib import Path
+from types import SimpleNamespace
 
 REPO = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(REPO / "scripts" / "runners" / "yolo"))
@@ -296,23 +302,17 @@ def compare_all_lower(report, section, statement, base, test, unit="ms", labels=
 
 
 # ----------------------------------------------------------------- main
-def main():
-    ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
-    for name in ["isolated", "concurrent", "sweep", "mps50", "goodput", "overhead", "clip"]:
-        ap.add_argument(f"--{name}", type=Path)
-    ap.add_argument("--reference", type=Path, default=REPO / "configs" / "paper_reference" / "revised_manuscript.json")
-    ap.add_argument("--output-dir", type=Path, default=Path("paper_comparison"))
-    args = ap.parse_args()
-    ref = json.loads(args.reference.read_text())
+def evaluate(ref, paths) -> "Report":
+    """Run every value and claim check for one set of result roots."""
     rep = Report(ref["tolerance"])
 
-    iso = load_isolated(args.isolated) if args.isolated else {}
+    iso = load_isolated(paths.isolated) if paths.isolated else {}
     iso_mean = {wl: mean(v) for wl, v in iso.items()}
-    if args.isolated:
+    if paths.isolated:
         for wl, paper in ref["fig2_motivation"]["isolated_mean_ms"].items():
             rep.value("Fig 2a", "isolated mean latency (ms)", paper, iso_mean.get(wl), "latency_rel", wl, "Isolated")
 
-    conc = load_concurrent(args.concurrent) if args.concurrent else {}
+    conc, paths.concurrent_sources = load_concurrent_many(paths.concurrent) if paths.concurrent else ({}, {})
     if conc:
         m = {mode: {wl: mean(v) for wl, v in d["lat"].items()} for mode, d in conc.items()}
         s = {mode: {wl: mean(v) for wl, v in d["sd_runs"].items()} for mode, d in conc.items()}
@@ -370,8 +370,8 @@ def main():
             if bb and bp:
                 rep.claim("Table 3", f"{MODE_NAME[prima]} shortens total time", bp < bb, f"{bb:.1f} s → {bp:.1f} s ({(bb - bp) / bb * 100:.0f}% less)")
 
-    if args.sweep:
-        sw = load_sweep(args.sweep)
+    if paths.sweep:
+        sw = load_sweep(paths.sweep)
         for key, paper in ref["table2_success_pct"].items():
             wl, gb = key.split("@")
             cell = sw.get((wl, f"{float(gb):.1f}"))
@@ -400,8 +400,8 @@ def main():
             rep.claim("Sec 3", "Once demand is met, isolated latency is flat across 1.0-2.5 GB (max/min < 1.10)",
                       all(r < 1.10 for _, r in flat), "; ".join(f"{wl} ×{r:.2f}" for wl, r in flat))
 
-    if args.mps50:
-        m50 = load_concurrent(args.mps50)
+    if paths.mps50:
+        m50 = load_concurrent(paths.mps50)
         if not iso_mean:
             rep.claim("Sec 5.2", "PRIMA gain grows from 2 to 4 SMs", None, "needs --isolated for normalization")
         else:
@@ -424,8 +424,8 @@ def main():
                 rep.claim("Sec 5.2", "PRIMA gain is larger at 4 SMs than at 2 SMs", mean(list(r4.values())) > mean(list(r2.values())),
                           f"mean reduction {mean(list(r2.values())):.0f}% → {mean(list(r4.values())):.0f}%")
 
-    if args.goodput:
-        gp = load_goodput(args.goodput)
+    if paths.goodput:
+        gp = load_goodput(paths.goodput)
         for mode, table in ref["table7_goodput_ms"].items():
             if mode not in gp:
                 continue
@@ -442,8 +442,8 @@ def main():
             rep.claim("Table 7", "Goodput run includes PRIMA modes", False,
                       "only one mode found; run_goodput_concurrent.sh has no memory limits, so Table 7's PRIMA columns cannot be checked")
 
-    if args.overhead:
-        summary = args.overhead / "overhead_summary.csv"
+    if paths.overhead:
+        summary = paths.overhead / "overhead_summary.csv"
         rows = list(csv.DictReader(summary.open())) if summary.exists() else []
         fe = {r["workload"]: float(r["mean_ms"]) for r in rows if r["stage"] == "feature_extraction"}
         rep.value("Fig 10a", "feature extraction (ms)", ref["fig10_overhead_ms"]["feature_extraction"]["CLS"], fe.get("CLS"), "overhead_rel", "CLS")
@@ -452,8 +452,8 @@ def main():
                   sum(yolo) if len(yolo) == 5 else None, "overhead_rel",
                   note="the paper measured on the i9 control node; a Jetson is expected to be slower")
 
-    if args.clip:
-        avg = args.clip / "clip_memory_peak_average.csv"
+    if paths.clip:
+        avg = paths.clip / "clip_memory_peak_average.csv"
         rows = list(csv.DictReader(avg.open())) if avg.exists() else []
         for model, paper in ref["table8_clip_actual_mb"].items():
             key = model.lower().replace("/", "").replace("-", "")
@@ -462,9 +462,176 @@ def main():
             value = float(row["avg_peak_container_memory_mib"]) if row and row.get("avg_peak_container_memory_mib") else None
             rep.value("Table 8", "measured memory (MB, container peak)", paper, value, "memory_rel", model)
 
-    text = rep.write(args.output_dir)
+    return rep
+
+
+# ----------------------------------------------------------------- discovery
+def run_index(path: Path) -> int:
+    match = re.search(r"_(\d+)$", path.name)
+    return int(match.group(1)) if match else 0
+
+
+def has_inference(root: Path, limit: int = 40) -> bool:
+    for n, output in enumerate(root.rglob("output.txt")):
+        if inference_ms(output):
+            return True
+        if n >= limit:
+            break
+    return False
+
+
+def latest_with_data(candidates, check) -> Path | None:
+    for path in sorted(candidates, key=run_index, reverse=True):
+        if path.is_dir() and check(path):
+            return path
+    return None
+
+
+def load_concurrent_many(roots):
+    """Merge concurrent roots: for each mode, the newest root with data wins."""
+    if isinstance(roots, Path):
+        roots = [roots]
+    merged, sources = {}, {}
+    for root in sorted(roots, key=run_index):
+        for mode, data in load_concurrent(root).items():
+            if any(data["lat"].values()):
+                merged[mode] = data
+                sources[mode] = root
+    return merged, sources
+
+
+def discover(artifact_root: Path) -> SimpleNamespace:
+    results = artifact_root / "yolo" / "results"
+    paths = SimpleNamespace(isolated=None, concurrent=None, sweep=None, mps50=None,
+                            goodput=None, overhead=None, clip=None, concurrent_sources={})
+    if results.is_dir():
+        paths.isolated = latest_with_data(results.glob("isolated_no_memlimit_*"), has_inference)
+        conc = [p for p in results.glob("concurrent_4mode_*") if p.is_dir()]
+        paths.concurrent = conc or None
+        paths.sweep = latest_with_data(results.glob("isolated_memory_sweep_*"), has_inference)
+        paths.mps50 = latest_with_data(results.glob("mps50_partitioning_*"), has_inference)
+    goodput = artifact_root / "goodput" / "results"
+    if goodput.is_dir():
+        paths.goodput = latest_with_data(goodput.glob("goodput_concurrent_*"),
+                                         lambda p: any(p.rglob("inference_latency.csv")))
+    clip = artifact_root / "clip"
+    if (clip / "clip_memory_peak_average.csv").exists():
+        paths.clip = clip
+    overhead = sorted(artifact_root.glob("**/overhead_summary.csv"), key=lambda p: p.stat().st_mtime)
+    if overhead:
+        paths.overhead = overhead[-1].parent
+    return paths
+
+
+def describe_inputs(name: str, paths) -> list[str]:
+    lines = [f"**{name}**", ""]
+    for key in ["isolated", "sweep", "mps50", "goodput", "overhead", "clip"]:
+        value = getattr(paths, key, None)
+        lines.append(f"- {key}: `{value}`" if value else f"- {key}: not found")
+    sources = getattr(paths, "concurrent_sources", {}) or {}
+    if sources:
+        for mode, root in sorted(sources.items()):
+            lines.append(f"- concurrent {mode}: `{root}`")
+    else:
+        lines.append("- concurrent: not found")
+    return lines + [""]
+
+
+# ----------------------------------------------------------------- combined report
+def write_combined(reports: dict, inputs: dict, out_dir: Path) -> str:
+    out_dir.mkdir(parents=True, exist_ok=True)
+    names = list(reports)
+    keyed = {}
+    order = []
+    for name, rep in reports.items():
+        for row in rep.rows:
+            key = (row["kind"], row["section"], row["item"], row["workload"], row["mode"])
+            if key not in keyed:
+                keyed[key] = {"paper": row["paper"], "sets": {}}
+                order.append(key)
+            keyed[key]["sets"][name] = row
+
+    with (out_dir / "paper_comparison.csv").open("w", newline="") as f:
+        fields = ["set", "kind", "section", "item", "workload", "mode", "paper", "measured", "diff", "diff_unit", "status", "note"]
+        w = csv.DictWriter(f, fieldnames=fields)
+        w.writeheader()
+        for name, rep in reports.items():
+            for row in rep.rows:
+                w.writerow({"set": name, **row})
+
+    lines = ["# Comparison with the revised paper", "", "## Inputs", ""]
+    for name in names:
+        lines += inputs[name]
+    lines += ["## Summary", "", "| Set | " + " | ".join(["HOLDS", "FAILS", "OK", "DIFF", "MISSING"]) + " |", "|---" * 6 + "|"]
+    for name, rep in reports.items():
+        counts = defaultdict(int)
+        for r in rep.rows:
+            counts[r["status"]] += 1
+        lines.append(f"| {name} | " + " | ".join(str(counts[k]) for k in ["HOLDS", "FAILS", "OK", "DIFF", "MISSING"]) + " |")
+
+    lines += ["", "## Claim checks", "", "| Section | Claim | " + " | ".join(names) + " |", "|---|---|" + "---|" * len(names)]
+    claim_keys = [k for k in order if k[0] == "claim"]
+    for key in claim_keys:
+        cells = [f"**{keyed[key]['sets'][n]['status']}**" if n in keyed[key]["sets"] else "" for n in names]
+        lines.append(f"| {key[1]} | {key[2]} | " + " | ".join(cells) + " |")
+    lines += ["", "### Claim evidence", ""]
+    for key in claim_keys:
+        lines.append(f"- {key[1]}: {key[2]}")
+        for n in names:
+            row = keyed[key]["sets"].get(n)
+            if row and row["note"]:
+                lines.append(f"  - {n}: {row['note']}")
+
+    lines += ["", "## Value checks", "", "Each cell: measured (difference from paper) status.", "",
+              "| Section | Item | WL | Mode | Paper | " + " | ".join(names) + " |", "|---|---|---|---|---|" + "---|" * len(names)]
+    for key in [k for k in order if k[0] == "value"]:
+        cells = []
+        for n in names:
+            row = keyed[key]["sets"].get(n)
+            if not row or row["measured"] is None:
+                cells.append("—")
+            else:
+                diff = "" if row["diff"] is None else f" ({row['diff']:+}{'%' if row['diff_unit'] == '%' else ''})"
+                cells.append(f"{row['measured']}{diff} {row['status']}")
+        lines.append(f"| {key[1]} | {key[2]} | {key[3]} | {key[4]} | {keyed[key]['paper']} | " + " | ".join(cells) + " |")
+    text = "\n".join(lines) + "\n"
+    (out_dir / "paper_comparison.md").write_text(text)
+    return text
+
+
+def main():
+    ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
+    ap.add_argument("--set", action="append", default=[], metavar="NAME=ARTIFACT_ROOT",
+                    help="compare a whole artifact root (repeatable); result folders are found automatically")
+    for name in ["isolated", "concurrent", "sweep", "mps50", "goodput", "overhead", "clip"]:
+        ap.add_argument(f"--{name}", type=Path, help=f"explicit {name} result root (single-set mode)")
+    ap.add_argument("--reference", type=Path, default=REPO / "configs" / "paper_reference" / "revised_manuscript.json")
+    ap.add_argument("--output-dir", type=Path, default=Path("paper_comparison"))
+    args = ap.parse_args()
+    ref = json.loads(args.reference.read_text())
+
+    sets = {}
+    for spec in args.set:
+        name, sep, root = spec.partition("=")
+        if not sep:
+            root, name = name, Path(name).parent.name or name
+        root = Path(root).expanduser()
+        if not root.is_dir():
+            raise SystemExit(f"artifact root not found: {root}")
+        sets[name] = discover(root)
+    explicit = {k: getattr(args, k) for k in ["isolated", "concurrent", "sweep", "mps50", "goodput", "overhead", "clip"]}
+    if any(explicit.values()):
+        sets["run"] = SimpleNamespace(**explicit, concurrent_sources={})
+    if not sets:
+        ap.error("give --set NAME=ARTIFACT_ROOT (repeatable) or explicit result roots")
+
+    reports, inputs = {}, {}
+    for name, paths in sets.items():
+        reports[name] = evaluate(ref, paths)
+        inputs[name] = describe_inputs(name, paths)
+    text = write_combined(reports, inputs, args.output_dir)
     print(text)
-    print(f"\n[written] {args.output_dir / 'paper_comparison.md'} and .csv")
+    print(f"[written] {args.output_dir / 'paper_comparison.md'} and .csv")
 
 
 if __name__ == "__main__":
