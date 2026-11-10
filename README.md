@@ -62,6 +62,7 @@ $PRIMA_WORK_ROOT/
 ├── prima_artifacts/         $PRIMA_ARTIFACT_ROOT
 │   ├── yolo/workload/       workload scripts, .pt/.onnx/.engine, image_lists/, 100-image inputs
 │   ├── yolo/results/        YOLO experiment results
+│   ├── paper_images/        optional: the paper's expanded_* image folders
 │   ├── yolo_runtime/        optional: 100-image inputs, if kept apart from workload/
 │   ├── goodput/results/     goodput results
 │   ├── clip/                CLIP weights, CIFAR-100, results
@@ -85,7 +86,7 @@ Path overrides, when a machine deviates from the layout:
 
 | Variable | Default | Used by |
 |---|---|---|
-| `DATASET_ROOT` | `prima_artifacts/yolo_runtime` if it holds `expanded_coco_images`, else `prima_artifacts/yolo/workload` | YOLO runners |
+| `DATASET_ROOT` | the first of `prima_artifacts/paper_images`, `prima_artifacts/yolo_runtime`, `prima_artifacts/yolo/workload` that holds the images named in the installed image lists; runners stop if a listed image is missing | YOLO runners |
 | `YOLO_ROOT` | the first of `yolo_runtime`, `yolo/workload` that holds `yolov8n.engine` | goodput |
 | `GOODPUT_DATASET_ROOT` | `$PRIMA_SSD_ROOT/prima_goodput_5000` | goodput |
 | `CLIP_ROOT` | `$PRIMA_ARTIFACT_ROOT/clip` | CLIP |

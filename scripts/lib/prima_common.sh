@@ -29,21 +29,62 @@ fi
 export PRIMA_ARTIFACT_ROOT PRIMA_SSD_ROOT
 
 # Directory that contains expanded_{imagenet,coco,dota}_images.
-# Order: $DATASET_ROOT, $PRIMA_ARTIFACT_ROOT/yolo_runtime, <experiment>/workload.
+# Order: $DATASET_ROOT; otherwise the first of $PRIMA_ARTIFACT_ROOT/paper_images,
+# $PRIMA_ARTIFACT_ROOT/yolo_runtime, <experiment>/workload that holds the
+# images named in the installed image lists (the paper set); if no list is
+# installed, the first of those that holds expanded_coco_images.
 prima_resolve_dataset_root() {
   local experiment_root="${1:-${PRIMA_ARTIFACT_ROOT}/yolo}"
   if [[ -n "${DATASET_ROOT:-}" ]]; then
     echo "$DATASET_ROOT"
     return
   fi
-  local candidate
-  for candidate in "${PRIMA_ARTIFACT_ROOT}/yolo_runtime" "${experiment_root}/workload"; do
+  local -a candidates=("${PRIMA_ARTIFACT_ROOT}/paper_images" "${PRIMA_ARTIFACT_ROOT}/yolo_runtime" "${experiment_root}/workload")
+  local candidate list probe=""
+  for list in "${experiment_root}"/workload/image_lists/dota_*.txt; do
+    [[ -f "$list" ]] && probe="$(basename "$(head -1 "$list")")" && break
+  done
+  if [[ -n "$probe" ]]; then
+    for candidate in "${candidates[@]}"; do
+      if [[ -f "${candidate}/expanded_dota_images/${probe}" ]]; then
+        echo "$candidate"
+        return
+      fi
+    done
+  fi
+  for candidate in "${candidates[@]}"; do
     if [[ -d "${candidate}/expanded_coco_images" ]]; then
       echo "$candidate"
       return
     fi
   done
   echo "${experiment_root}/workload"
+}
+
+# Stop before a run when an image named in the lists is not in the dataset
+# root. Usage: prima_check_image_set DATASET_ROOT LIST_DIR IMAGE_LIMIT
+prima_check_image_set() {
+  local dataset_root="$1" list_dir="$2" limit="$3" ds list entry missing checked=0
+  for ds in imagenet coco dota; do
+    list="${list_dir}/${ds}_${limit}.txt"
+    [[ -f "$list" ]] || continue
+    checked=$((checked + 1))
+    missing=0
+    while IFS= read -r entry; do
+      [[ -z "$entry" ]] && continue
+      [[ -f "${dataset_root}/expanded_${ds}_images/$(basename "$entry")" ]] || missing=$((missing + 1))
+    done < "$list"
+    if (( missing > 0 )); then
+      echo "[ERROR] ${missing} image(s) listed in ${list} are missing from ${dataset_root}/expanded_${ds}_images." >&2
+      echo "        Set DATASET_ROOT to the folder holding the paper images (expanded_*), or see README Section 3.2." >&2
+      exit 1
+    fi
+  done
+  if (( checked == 0 )); then
+    echo "[WARN] no image lists for IMAGE_LIMIT=${limit} in ${list_dir}; the image set is not checked." >&2
+  else
+    echo "[INFO] image set OK: ${dataset_root} (lists ${list_dir}/*_${limit}.txt)"
+  fi
 }
 
 # Directory that contains the yolov8n*.engine files (goodput runner).
