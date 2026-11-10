@@ -1,0 +1,7 @@
+expanded_coco_images 250
+expanded_dota_images 250
+expanded_dota_images2 32
+expanded_imagenet_images 250
+dota_images 100
+coco_images 100
+imagenet_images 100

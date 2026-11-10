@@ -1,0 +1,8 @@
+total 152
+drwxrwxr-x  2 oslab oslab  4096 Dec  5  2024 .
+drwxrwxr-x 33 oslab oslab  4096 Jun 17  2025 ..
+-rwxrwxr-x  1 oslab oslab 34469 Dec  5  2024 classify_memory_memory_result.txt
+-rwxrwxr-x  1 oslab oslab 27555 Dec  5  2024 detect_memory_memory_result.txt
+-rwxrwxr-x  1 oslab oslab 23981 Dec  5  2024 obb_memory_memory_result.txt
+-rwxrwxr-x  1 oslab oslab 25664 Dec  5  2024 pose_memory_memory_result.txt
+-rwxrwxr-x  1 oslab oslab 27680 Dec  5  2024 segment_memory_memory_result.txt

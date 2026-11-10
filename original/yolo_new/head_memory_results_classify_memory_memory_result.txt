@@ -1,0 +1,50 @@
+Before loading model - RES Memory usage: 346.26 MB
+Before starting inference - RES Memory usage: 369.88 MB
+Loading yolov8n-cls.engine for TensorRT inference...
+[11/11/2024-01:49:33] [TRT] [I] Loaded engine size: 11 MiB
+[11/11/2024-01:49:33] [TRT] [W] Using an engine plan file across different models of devices is not recommended and is likely to affect performance or even cause errors.
+[11/11/2024-01:49:33] [TRT] [I] [MemUsageChange] TensorRT-managed allocation in engine deserialization: CPU +0, GPU +10, now: CPU 0, GPU 10 (MiB)
+[11/11/2024-01:49:33] [TRT] [I] [MemUsageChange] TensorRT-managed allocation in IExecutionContext creation: CPU +0, GPU +2, now: CPU 0, GPU 12 (MiB)
+
+[11/11/2024-01:49:35] [TRT] [E] 3: [executionContext.cpp::validateInputBindings::1831] Error Code 3: API Usage Error (Parameter check failed at: runtime/api/executionContext.cpp::validateInputBindings::1831, condition: profileMaxDims.d[i] >= dimensions.d[i]. Supplied binding dimension [1,3,640,640] for bindings[0] exceed min ~ max range at index 2, maximum dimension in profile is 224, minimum dimension in profile is 224, but supplied dimension is 640.
+)
+image 1/1 /usr/src/ultralytics/yolo_new/imagenet_images/000602893992634.jpg: 640x640 window_shade 0.38, velvet 0.10, shoji 0.08, window_screen 0.04, screen 0.02, 4.0ms
+Speed: 32.8ms preprocess, 4.0ms inference, 0.3ms postprocess per image at shape (1, 3, 640, 640)
+Processed image 1/100 - RES Memory usage: 2048.00 MB
+
+image 1/1 /usr/src/ultralytics/yolo_new/imagenet_images/004381737243595.jpg: 640x640 shopping_basket 0.14, binder 0.10, file 0.06, velvet 0.06, window_shade 0.06, 4.2ms
+Speed: 26.9ms preprocess, 4.2ms inference, 0.4ms postprocess per image at shape (1, 3, 640, 640)
+Processed image 2/100 - RES Memory usage: 2048.00 MB
+
+image 1/1 /usr/src/ultralytics/yolo_new/imagenet_images/0018068283583538847.jpg: 640x640 water_snake 0.07, window_shade 0.06, canoe 0.05, binder 0.04, envelope 0.03, 4.1ms
+Speed: 27.5ms preprocess, 4.1ms inference, 0.3ms postprocess per image at shape (1, 3, 640, 640)
+Processed image 3/100 - RES Memory usage: 2150.40 MB
+
+image 1/1 /usr/src/ultralytics/yolo_new/imagenet_images/0328172172944867.jpg: 640x640 file 0.14, doormat 0.07, window_screen 0.06, water_snake 0.06, beaver 0.06, 4.1ms
+Speed: 28.9ms preprocess, 4.1ms inference, 0.3ms postprocess per image at shape (1, 3, 640, 640)
+Processed image 4/100 - RES Memory usage: 2150.40 MB
+
+image 1/1 /usr/src/ultralytics/yolo_new/imagenet_images/012786577268754.jpg: 640x640 American_alligator 0.27, water_snake 0.06, little_blue_heron 0.05, African_crocodile 0.04, oystercatcher 0.04, 4.0ms
+Speed: 27.7ms preprocess, 4.0ms inference, 0.3ms postprocess per image at shape (1, 3, 640, 640)
+Processed image 5/100 - RES Memory usage: 2150.40 MB
+
+image 1/1 /usr/src/ultralytics/yolo_new/imagenet_images/002545179789348.jpg: 640x640 velvet 0.46, dugong 0.13, window_shade 0.04, sea_snake 0.03, wool 0.02, 4.1ms
+Speed: 28.4ms preprocess, 4.1ms inference, 0.3ms postprocess per image at shape (1, 3, 640, 640)
+Processed image 6/100 - RES Memory usage: 2150.40 MB
+
+image 1/1 /usr/src/ultralytics/yolo_new/imagenet_images/0092380250636166.jpg: 640x640 wool 0.08, sea_snake 0.08, beaver 0.06, American_egret 0.05, velvet 0.05, 4.0ms
+Speed: 27.2ms preprocess, 4.0ms inference, 0.3ms postprocess per image at shape (1, 3, 640, 640)
+Processed image 7/100 - RES Memory usage: 2150.40 MB
+
+image 1/1 /usr/src/ultralytics/yolo_new/imagenet_images/021453592652114.jpg: 640x640 American_alligator 0.27, red-breasted_merganser 0.12, oystercatcher 0.08, American_coot 0.07, African_crocodile 0.05, 4.0ms
+Speed: 28.0ms preprocess, 4.0ms inference, 0.3ms postprocess per image at shape (1, 3, 640, 640)
+Processed image 8/100 - RES Memory usage: 2150.40 MB
+
+image 1/1 /usr/src/ultralytics/yolo_new/imagenet_images/0016478399954196.jpg: 640x640 velvet 0.15, grey_whale 0.08, killer_whale 0.04, albatross 0.04, American_alligator 0.03, 4.0ms
+Speed: 28.7ms preprocess, 4.0ms inference, 0.3ms postprocess per image at shape (1, 3, 640, 640)
+Processed image 9/100 - RES Memory usage: 2150.40 MB
+
+image 1/1 /usr/src/ultralytics/yolo_new/imagenet_images/0146285665570243.jpg: 640x640 American_alligator 0.28, beaver 0.07, African_crocodile 0.05, sea_snake 0.04, water_snake 0.04, 4.1ms
+Speed: 26.4ms preprocess, 4.1ms inference, 0.3ms postprocess per image at shape (1, 3, 640, 640)
+Processed image 10/100 - RES Memory usage: 2150.40 MB
+

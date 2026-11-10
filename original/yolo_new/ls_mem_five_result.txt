@@ -1,0 +1,4 @@
+total 64
+drwxrwxr-x  2 oslab oslab  4096 Dec 24  2024 .
+drwxrwxr-x 33 oslab oslab  4096 Jun 17  2025 ..
+-rw-rw-r--  1 oslab oslab 55800 Dec 24  2024 memory_res.txt

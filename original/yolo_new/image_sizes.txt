@@ -1,0 +1,5 @@
+expanded_dota_images 250 first100 min (462, 593) max (7838, 2133) mean MPix 4.39 first files ['001_P0009.png', '002_P0014.png', '003_P0015.png']
+expanded_dota_images2 32 first100 min (462, 593) max (5343, 3795) mean MPix 6.94 first files ['001_P0009.png', '002_P0014.png', '003_P0015.png']
+dota_images 100 first100 min (390, 1056) max (10240, 4096) mean MPix 5.23 first files ['P0045.png', 'P0045_copy.png', 'P0046.png']
+expanded_coco_images 250 first100 min (333, 500) max (640, 632) mean MPix 0.25 first files ['000_000000000676.jpg', '001_000000002464.jpg', '002_000000002354.jpg']
+expanded_imagenet_images 250 first100 min (150, 200) max (800, 600) mean MPix 0.19 first files ['000_0033879322901047.jpg', '001_021453592652114.jpg', '002_0459161221654099.jpg']
