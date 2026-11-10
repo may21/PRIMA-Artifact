@@ -28,6 +28,11 @@ fi
 : "${PRIMA_SSD_ROOT:=/home/orin1/ssd}"
 export PRIMA_ARTIFACT_ROOT PRIMA_SSD_ROOT
 
+if [[ ! -d "$PRIMA_ARTIFACT_ROOT" && -z "${PRIMA_QUIET_ROOT_CHECK:-}" ]]; then
+  echo "[WARN] PRIMA_ARTIFACT_ROOT=${PRIMA_ARTIFACT_ROOT} does not exist on this machine." >&2
+  echo "       Set it (or PRIMA_WORK_ROOT) in this shell, e.g. export PRIMA_ARTIFACT_ROOT=\$HOME/prima_test/prima_artifacts" >&2
+fi
+
 # Directory that contains expanded_{imagenet,coco,dota}_images.
 # Order: $DATASET_ROOT; otherwise the first of $PRIMA_ARTIFACT_ROOT/paper_images,
 # $PRIMA_ARTIFACT_ROOT/yolo_runtime, <experiment>/workload that holds the
