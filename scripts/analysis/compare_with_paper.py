@@ -355,6 +355,10 @@ def evaluate(ref, paths) -> "Report":
                               {wl: m.get("ts_unlimited", {}).get(wl) for wl in WORKLOADS}, iso_mean, labels=("TS", "Isolated"))
         compare_all_lower(rep, "Sec 3", "MPS-2 is slower than TS for every workload",
                           m.get("mps20_unlimited", {}), m.get("ts_unlimited", {}), labels=("MPS-2", "TS"))
+        mixed = {mode for mode, src in (getattr(paths, "concurrent_sources", {}) or {}).items() if "MIXED" in str(src)}
+        if mixed:
+            rep.claim("Inputs", "Baseline and PRIMA modes come from the same session", False,
+                      "mixed folders for " + ", ".join(sorted(mixed)))
         compare_all_lower(rep, "Sec 5.1", "PRIMA-TS lowers mean latency of every workload", m.get("ts_unlimited", {}), m.get("ts_memlimit", {}), labels=("TS", "PRIMA-TS"))
         compare_all_lower(rep, "Sec 5.1", "PRIMA-MPS lowers mean latency of every workload", m.get("mps20_unlimited", {}), m.get("mps20_memlimit", {}), labels=("MPS", "PRIMA-MPS"))
         compare_all_lower(rep, "Sec 5.1", "PRIMA-TS lowers latency SD of every workload", s.get("ts_unlimited", {}), s.get("ts_memlimit", {}), labels=("TS", "PRIMA-TS"))
@@ -487,16 +491,36 @@ def latest_with_data(candidates, check) -> Path | None:
     return None
 
 
+PAIRED_MODES = [("ts_unlimited", "ts_memlimit"), ("mps20_unlimited", "mps20_memlimit"),
+                ("mps50_unlimited", "mps50_memlimit")]
+
+
 def load_concurrent_many(roots):
-    """Merge concurrent roots: for each mode, the newest root with data wins."""
+    """Merge concurrent roots.
+
+    A baseline and its PRIMA mode are taken from the same folder (the newest
+    one that holds both), so they come from one session. Modes without a
+    partner in any folder fall back to the newest folder that holds them.
+    """
     if isinstance(roots, Path):
         roots = [roots]
-    merged, sources = {}, {}
+    per_root = []
     for root in sorted(roots, key=run_index):
-        for mode, data in load_concurrent(root).items():
-            if any(data["lat"].values()):
-                merged[mode] = data
-                sources[mode] = root
+        modes = {m: d for m, d in load_concurrent(root).items() if any(d["lat"].values())}
+        per_root.append((root, modes))
+    merged, sources = {}, {}
+    for root, modes in per_root:  # newest wins for unpaired modes
+        for mode, data in modes.items():
+            merged[mode], sources[mode] = data, root
+    for pair in PAIRED_MODES:
+        both = [(root, modes) for root, modes in per_root if all(m in modes for m in pair)]
+        if both:
+            root, modes = both[-1]
+            for mode in pair:
+                merged[mode], sources[mode] = modes[mode], root
+        elif all(m in sources for m in pair) and sources[pair[0]] != sources[pair[1]]:
+            for mode in pair:
+                sources[mode] = Path(f"{sources[mode]}  (MIXED: no folder holds both {pair[0]} and {pair[1]})")
     return merged, sources
 
 
