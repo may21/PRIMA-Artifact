@@ -134,6 +134,8 @@ def read_isolated_peaks(root: Path, statistic: str) -> dict[str, float]:
     otherwise scans raw run directories (<root>/**/run*/) for pidstat, and
     finally for cgroup memory samples.
     """
+    if not root.is_dir():
+        raise SystemExit(f"isolated result root does not exist or is not readable: {root}")
     values: dict[str, list[float]] = defaultdict(list)
     summary = root / "organized" / "isolated_no_memlimit_pidstat_memory_peak_summary.csv"
     if summary.exists():
