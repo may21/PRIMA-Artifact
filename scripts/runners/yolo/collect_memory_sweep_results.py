@@ -8,6 +8,9 @@ import sys
 from collections import defaultdict
 from pathlib import Path
 
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+from log_formats import normalize_time_prefix, parse_inference_line  # noqa: E402
+
 
 WORKLOAD_LABEL = {
     "classify": "CLS",
@@ -87,16 +90,16 @@ def main():
         if output_path.exists():
             for line in output_path.read_text(errors="replace").splitlines():
                 clean = re.sub(r"\x1b\[[0-9;]*m", "", line).strip()
-                match = IMAGE_RE.match(clean)
-                if match:
+                parsed = parse_inference_line(clean)
+                if parsed:
                     row = {
                         "workload": workload,
                         "memory_label": memory_label,
                         "memory_limit_gb": MEMORY_GB[memory_label],
                         "repeat": repeat,
-                        "image_index": int(match.group("index")),
-                        "image_count": int(match.group("count")),
-                        "inference_ms": float(match.group("ms")),
+                        "image_index": parsed[0],
+                        "image_count": parsed[1],
+                        "inference_ms": parsed[2],
                     }
                     inference_rows.append(row)
                     image_values.append(row["inference_ms"])

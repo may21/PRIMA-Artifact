@@ -5,6 +5,9 @@ import sys
 from collections import defaultdict
 from pathlib import Path
 
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+from log_formats import normalize_time_prefix, parse_inference_line  # noqa: E402
+
 
 WORKLOAD_LABELS = {
     "classify": "CLS",
@@ -86,6 +89,9 @@ def main():
 
     for run_dir in run_dirs:
         mode, repeat = run_context(run_dir)
+        # TGID -> workload, from the python_pid.txt each runner records. pidstat's
+        # Command column only says python3/pt_main_thread for most workload scripts.
+        pid_to_process = {}
 
         for workload_dir in sorted(p for p in run_dir.iterdir() if p.is_dir()):
             workload_name = workload_dir.name
@@ -93,8 +99,11 @@ def main():
                 continue
             workload = WORKLOAD_LABELS[workload_name]
             pid_path = workload_dir / "python_pid.txt"
-            pid = int(pid_path.read_text().strip()) if pid_path.exists() else None
+            pid_text = pid_path.read_text().split() if pid_path.exists() else []
+            pid = int(pid_text[0]) if pid_text and pid_text[0].isdigit() else None
             expected_pids[(mode, repeat, workload_name)] = pid
+            if pid is not None:
+                pid_to_process[pid] = workload_name
 
             config = {}
             config_path = workload_dir / "config.txt"
@@ -171,12 +180,17 @@ def main():
         pidstat_path = run_dir / "system_pidstat.txt"
         if pidstat_path.exists():
             for raw_line in pidstat_path.read_text(errors="replace").splitlines():
-                parts = raw_line.split()
-                if len(parts) != 16 or parts[-1] not in WORKLOAD_LABELS:
+                parts = normalize_time_prefix(raw_line).split()
+                # time UID TGID TID %usr %system %guest %wait %CPU CPU minflt/s majflt/s VSZ RSS %MEM Command
+                if len(parts) != 16 or not parts[2].isdigit() or parts[3] != "-":
                     continue
-                process_name = parts[-1]
-                workload = WORKLOAD_LABELS[process_name]
                 tgid = int(parts[2])
+                process_name = pid_to_process.get(tgid)
+                if process_name is None and parts[-1] in WORKLOAD_LABELS:
+                    process_name = parts[-1]  # scripts that set their process name
+                if process_name is None:
+                    continue
+                workload = WORKLOAD_LABELS[process_name]
                 expected_pid = expected_pids.get((mode, repeat, process_name))
                 workload_cpu_mem.append(
                     {
@@ -204,7 +218,7 @@ def main():
         mpstat_path = run_dir / "system_mpstat.txt"
         if mpstat_path.exists():
             for raw_line in mpstat_path.read_text(errors="replace").splitlines():
-                parts = raw_line.split()
+                parts = normalize_time_prefix(raw_line).split()
                 if len(parts) != 12 or parts[1] != "all":
                     continue
                 system_cpu.append(

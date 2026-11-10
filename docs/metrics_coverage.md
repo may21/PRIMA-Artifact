@@ -20,6 +20,6 @@ Known requirements before a full rerun:
 
 - Run `sudo -v` on Orin1 before runners that use `perf` or cgroup controls.
 - Keep swap disabled for the reported memory-isolation and goodput experiments.
-- Prepare `/home/orin1/ssd/prima_goodput_5000` before running goodput. OBB defaults to `UNIQUE_IMAGES_OBB=auto`, which uses all DOTA val/test originals while still recording 5,000 measured requests.
-- Keep TensorRT engines, image lists, and datasets under `/home/orin1/prima_artifacts`; they are not committed.
+- Prepare `$PRIMA_SSD_ROOT/prima_goodput_5000` (`scripts/setup/prepare_goodput_datasets.sh`) before running goodput. OBB defaults to `UNIQUE_IMAGES_OBB=auto`, which uses all DOTA val/test originals while still recording 5,000 measured requests.
+- Keep TensorRT engines, image lists, and datasets under `$PRIMA_ARTIFACT_ROOT` (README Section 3); they are not committed.
 - Keep ONNX graph files for Predictor feature extraction available at the paths in `configs/workloads/overhead_models.csv`, or pass a replacement `MODEL_CSV`.
