@@ -31,6 +31,7 @@ for dataset in expanded_imagenet_images expanded_coco_images expanded_dota_image
   }
 done
 
+prima_require_mode_limits
 mkdir -p "$RESULT"
 echo "workload,exit_status,completed_requests,elapsed_sec,csv" > "$SUMMARY"
 
@@ -104,6 +105,7 @@ done
   echo "measurement=result.speed[inference]"
   echo "goodput_dataset_root=${GOODPUT_DATASET_ROOT}"
   echo "yolo_root=${YOLO}"
+  echo "${PRIMA_CLOCK_LIMITS:-clock_limits=unchecked}"
   echo "power_mode=$(nvpmodel -q | tr '\n' ' ')"
   echo "swap=off"
   echo "completed_at=$(date --iso-8601=seconds)"

@@ -98,6 +98,7 @@ docker image inspect "$IMAGE" >/dev/null 2>&1 || {
 }
 
 echo "[INFO] Verify swap/perf prerequisites."
+prima_require_mode_limits
 if [[ -s /proc/swaps ]] && [[ "$(wc -l < /proc/swaps)" -gt 1 ]]; then
   timeout 20s sudo -n swapoff -a || true
 fi
@@ -135,6 +136,7 @@ fi
   echo "dataset_root=${DATASET_ROOT}"
   echo "perf_bin=${PERF_BIN}"
   echo "locale=${LC_ALL}"
+  echo "${PRIMA_CLOCK_LIMITS:-clock_limits=unchecked}"
   echo "dataset_root=${DATASET_ROOT}"
   echo "memory_limits=${MEMORY_LIMITS[*]}"
   echo "swap_policy=host swap off; docker memory-swap equals memory limit; cgroup swap.current sampled"
