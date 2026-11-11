@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import argparse
 import csv
+import os
 import statistics
 import sys
 import time
@@ -39,6 +40,18 @@ def read_models(path: Path) -> list[dict[str, str]]:
     missing = required - set(rows[0]) if rows else required
     if missing:
         raise SystemExit(f"missing columns in {path}: {sorted(missing)}")
+    artifact_root = os.environ.get("PRIMA_ARTIFACT_ROOT", "/home/orin1/prima_artifacts")
+    os.environ.setdefault("PRIMA_ARTIFACT_ROOT", artifact_root)
+    for row in rows:
+        resolved = Path(os.path.expandvars(row["onnx_path"]))
+        if not resolved.exists():
+            # ONNX files exported next to the engines are accepted as well.
+            fallback = Path(artifact_root) / "yolo" / "workload" / resolved.name
+            if fallback.exists():
+                resolved = fallback
+        if not resolved.exists():
+            raise SystemExit(f"ONNX model not found for {row['workload']}: {resolved}")
+        row["onnx_path"] = str(resolved)
     return rows
 
 

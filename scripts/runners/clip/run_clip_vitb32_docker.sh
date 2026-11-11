@@ -1,4 +1,5 @@
 #!/bin/bash
+source "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/../../lib/prima_common.sh"
 
 # Keep cleanup active even when the workload fails.
 
@@ -11,6 +12,12 @@ SCRIPT="infer_clip_vitb32.py"
 DOCKER_IMAGE="${DOCKER_IMAGE:-clip-full:jetson}"
 CONTAINER_NAME="${WORKLOAD_NAME}_$(date +%Y%m%d_%H%M%S)"
 
+[[ -x /usr/bin/time ]] || { echo "[ERROR] /usr/bin/time is required (sudo apt install time)" >&2; exit 1; }
+docker image inspect "${DOCKER_IMAGE}" >/dev/null 2>&1 || {
+    echo "[ERROR] missing Docker image ${DOCKER_IMAGE}; build it with scripts/setup/build_clip_image.sh" >&2
+    exit 1
+}
+mkdir -p "${CLIP_ROOT}"
 cd "${CLIP_ROOT}"
 RESULT_DIR="results/${WORKLOAD_NAME}_$(date +%Y%m%d_%H%M%S)"
 mkdir -p "${RESULT_DIR}"
@@ -29,19 +36,13 @@ DOCKER_STATS_PID=""
 cleanup() {
     echo "[INFO] Cleaning up monitors..."
 
-    if [ -n "$MPSTAT_PID" ]; then kill "$MPSTAT_PID" 2>/dev/null || true; fi
-    if [ -n "$VMSTAT_PID" ]; then kill "$VMSTAT_PID" 2>/dev/null || true; fi
-    if [ -n "$PIDSTAT_PID" ]; then kill "$PIDSTAT_PID" 2>/dev/null || true; fi
-    if [ -n "$TEGRA_PID" ]; then kill "$TEGRA_PID" 2>/dev/null || true; fi
-    if [ -n "$DOCKER_STATS_PID" ]; then kill "$DOCKER_STATS_PID" 2>/dev/null || true; fi
-
-    wait "$MPSTAT_PID" 2>/dev/null || true
-    wait "$VMSTAT_PID" 2>/dev/null || true
-    wait "$PIDSTAT_PID" 2>/dev/null || true
-    wait "$TEGRA_PID" 2>/dev/null || true
-    wait "$DOCKER_STATS_PID" 2>/dev/null || true
+    # Bounded stop: docker stats can ignore SIGINT/SIGTERM and used to block
+    # the cleanup (and therefore the next repeat) indefinitely.
+    prima_stop_pids "$MPSTAT_PID" "$VMSTAT_PID" "$PIDSTAT_PID" "$TEGRA_PID" "$DOCKER_STATS_PID"
+    MPSTAT_PID=""; VMSTAT_PID=""; PIDSTAT_PID=""; TEGRA_PID=""; DOCKER_STATS_PID=""
 
     docker rm -f "${CONTAINER_NAME}" >/dev/null 2>&1 || true
+    prima_tty_restore
 }
 
 trap cleanup EXIT INT TERM
@@ -121,7 +122,12 @@ START_NS=$(date +%s%N)
 
 APP_PID=$!
 
-sleep 1
+# Start docker stats only once the container exists (avoids "No such container").
+for _ in $(seq 1 100); do
+    docker inspect "${CONTAINER_NAME}" >/dev/null 2>&1 && break
+    kill -0 "${APP_PID}" 2>/dev/null || break
+    sleep 0.1
+done
 
 echo "[INFO] Starting docker stats..."
 

@@ -1,7 +1,8 @@
 #!/usr/bin/env bash
 set -euo pipefail
+source "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/../lib/prima_common.sh"
 
-ROOT="${GOODPUT_DATASET_ROOT:-/home/orin1/ssd/prima_goodput_5000}"
+ROOT="${GOODPUT_DATASET_ROOT:-${PRIMA_SSD_ROOT}/prima_goodput_5000}"
 DOWNLOAD_DIR="${GOODPUT_DOWNLOAD_DIR:-${ROOT}/_downloads}"
 COCO_URL="${COCO_URL:-http://images.cocodataset.org/zips/val2017.zip}"
 IMAGENET_URL="${IMAGENET_URL:-https://image-net.org/data/ILSVRC/2012/ILSVRC2012_img_val.tar}"

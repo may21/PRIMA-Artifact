@@ -1,11 +1,12 @@
 #!/bin/bash
 set -euo pipefail
+source "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/../../lib/prima_common.sh"
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PRIMA_ARTIFACT_ROOT="${PRIMA_ARTIFACT_ROOT:-/home/orin1/prima_artifacts}"
 BASE="${GOODPUT_ROOT:-${PRIMA_ARTIFACT_ROOT}/goodput}"
-YOLO="${YOLO_ROOT:-${PRIMA_ARTIFACT_ROOT}/yolo_runtime}"
-GOODPUT_DATASET_ROOT="${GOODPUT_DATASET_ROOT:-$YOLO}"
+YOLO="$(prima_resolve_yolo_root)"
+GOODPUT_DATASET_ROOT="${GOODPUT_DATASET_ROOT:-${PRIMA_SSD_ROOT}/prima_goodput_5000}"
 PY="${SCRIPT_DIR}/repeat_goodput.py"
 IMAGE="${IMAGE:-ultralytics/ultralytics:8.3.102-jetson-jetpack6}"
 UNIQUE_IMAGES="${UNIQUE_IMAGES:-5000}"
@@ -16,6 +17,19 @@ RESULT="${GOODPUT_RESULT_OVERRIDE:-${BASE}/results/goodput_concurrent_${UNIQUE_I
 STATE="${BASE}/goodput_concurrent_${UNIQUE_IMAGES}x${LOOPS}_15W.state"
 SUMMARY="${RESULT}/summary.csv"
 WORKLOADS=(classify detect pose segment obb)
+
+for workload_engine in yolov8n-cls yolov8n yolov8n-pose yolov8n-seg yolov8n-obb; do
+  [[ -f "${YOLO}/${workload_engine}.engine" ]] || {
+    echo "[ERROR] missing TensorRT engine ${YOLO}/${workload_engine}.engine (set YOLO_ROOT or run scripts/setup/export_yolo_engines.sh)" >&2
+    exit 1
+  }
+done
+for dataset in expanded_imagenet_images expanded_coco_images expanded_dota_images; do
+  [[ -d "${GOODPUT_DATASET_ROOT}/${dataset}" ]] || {
+    echo "[ERROR] missing dataset ${GOODPUT_DATASET_ROOT}/${dataset} (set GOODPUT_DATASET_ROOT or PRIMA_SSD_ROOT)" >&2
+    exit 1
+  }
+done
 
 mkdir -p "$RESULT"
 echo "workload,exit_status,completed_requests,elapsed_sec,csv" > "$SUMMARY"
@@ -89,6 +103,7 @@ done
   echo "save_results=false"
   echo "measurement=result.speed[inference]"
   echo "goodput_dataset_root=${GOODPUT_DATASET_ROOT}"
+  echo "yolo_root=${YOLO}"
   echo "power_mode=$(nvpmodel -q | tr '\n' ' ')"
   echo "swap=off"
   echo "completed_at=$(date --iso-8601=seconds)"
