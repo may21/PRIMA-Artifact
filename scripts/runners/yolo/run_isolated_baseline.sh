@@ -11,6 +11,7 @@ DATASET_ROOT="$(prima_resolve_dataset_root "$BASE")"
 CONTAINER_YOLO_DIR="/usr/src/ultralytics/yolo_new"
 IMAGE_LIMIT="${IMAGE_LIMIT:-100}"
 prima_check_image_set "$DATASET_ROOT" "${HOST_YOLO_DIR}/image_lists" "$IMAGE_LIMIT"
+prima_require_mode_limits
 REPEAT_START="${REPEAT_START:-1}"
 REPEAT_END="${REPEAT_END:-3}"
 RESULT_ROOT="${RESULT_ROOT_OVERRIDE:-$BASE/results/isolated_no_memlimit_100_1}"
@@ -30,6 +31,7 @@ echo "mode,workload,repeat,container,exit_status,oom_killed,result_dir" > "$SUMM
   echo "image=$IMAGE"
   echo "dataset_root=$DATASET_ROOT"
   echo "locale=$LC_ALL"
+  echo "${PRIMA_CLOCK_LIMITS:-clock_limits=unchecked}"
   nvpmodel -q 2>/dev/null | tr '\n' ' '; echo
 } > "$RESULT_ROOT/experiment_config.txt"
 cat /proc/swaps > "$RESULT_ROOT/swaps_start.txt"

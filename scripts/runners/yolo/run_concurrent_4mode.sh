@@ -261,6 +261,7 @@ done
 
 echo "[INFO] Authenticate once for perf and cgroup swap control."
 sudo -v
+prima_require_mode_limits
 if [[ -s /proc/swaps ]] && [[ "$(wc -l < /proc/swaps)" -gt 1 ]]; then
   timeout 20s sudo -n swapoff -a || true
 fi
@@ -306,6 +307,7 @@ echo "mode,repeat,workload,memory_limit,swap_max,container,exit_status,oom_kille
   echo "dataset_root=${DATASET_ROOT}"
   echo "perf_bin=${PERF_BIN}"
   echo "locale=${LC_ALL}"
+  echo "${PRIMA_CLOCK_LIMITS:-clock_limits=unchecked}"
 } > "${RESULT_ROOT}/experiment_config.txt"
 prima_tty_prepare
 

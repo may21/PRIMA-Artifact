@@ -124,6 +124,17 @@ preparing the inputs:
 scripts and images matter: the memory pressure the paper measures comes from
 them.
 
+**Clock limits.** `nvpmodel -q` can report a power mode whose limits are not in effect:
+on some JetPack 6.2 boards the nvpmodel boot service fails with "Reboot required for
+changing to this power mode" at every boot, and the CPU, GPU and memory clocks stay
+at the MAXN SUPER limits. Apply the mode's limits directly after each boot; every YOLO
+and goodput runner checks them, records them in `experiment_config.txt`, and stops if
+they are above the mode (override with `PRIMA_ALLOW_UNCAPPED=1`):
+
+```bash
+sudo -v && ./scripts/setup/apply_power_mode_limits.sh
+```
+
 Then verify the node; it lists every missing item:
 
 ```bash

@@ -14,6 +14,8 @@ fail() { echo "[FAIL] $*"; failures=$((failures + 1)); }
 echo "[info] $(uname -r) | $(tr -d '\0' </proc/device-tree/model 2>/dev/null || echo unknown device)"
 echo "[info] PRIMA_ARTIFACT_ROOT=${PRIMA_ARTIFACT_ROOT}  PRIMA_SSD_ROOT=${PRIMA_SSD_ROOT}"
 echo "[info] power mode: $(nvpmodel -q 2>/dev/null | tr '\n' ' ' || echo unknown)"
+if out="$(prima_check_mode_limits 2>/dev/null)"; then ok "clock limits within the power mode"; else fail "clock limits above the power mode: run scripts/setup/apply_power_mode_limits.sh"; fi
+echo "$out" | sed 's/^/[info] /'
 
 for cmd in python3 docker pidstat mpstat vmstat top tegrastats nvidia-cuda-mps-control; do
   command -v "$cmd" >/dev/null 2>&1 && ok "$cmd" || fail "missing command: $cmd"

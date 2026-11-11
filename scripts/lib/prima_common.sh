@@ -191,6 +191,101 @@ prima_stop_pids() {
   return 0
 }
 
+# ---------------------------------------------------------------- clock limits
+# nvpmodel can report a mode whose clock limits were never applied (on some
+# JetPack 6.2 boards its boot service loops on "reboot required"). These
+# helpers read the limits of a power mode from /etc/nvpmodel.conf, apply them
+# directly, and check them before a run.
+#
+# prima_mode_limits [MODE_ID] prints one line per limit of that mode:
+#   NAME KIND VALUE PATH [ALT_PATH]
+# e.g. "GPU MAX_FREQ 612000000 /sys/devices/17000000.ga10b/devfreq/.../max_freq".
+# Limits of -1 (no limit) are left out.
+prima_mode_limits() {
+  local mode="${1:-${POWER_MODE_ID:-$(nvpmodel -q 2>/dev/null | sed -n 2p | tr -dc '0-9')}}"
+  local conf="${NVPMODEL_CONF:-/etc/nvpmodel.conf}"
+  [[ -n "$mode" && -r "$conf" ]] || return 1
+  awk -v mode="$mode" '
+    function trim(x) { gsub(/^[ \t]+|[ \t]+$/, "", x); return x }
+    /^<[ \t]*PARAM[ \t]+TYPE=CLOCK[ \t]+NAME=/ {
+      name = $0; sub(/.*NAME=/, "", name); sub(/[ \t]*>.*/, "", name); param = name; next
+    }
+    /^<[ \t]*PARAM/ { param = ""; next }
+    /^<[ \t]*POWER_MODEL[ \t]+ID=/ {
+      id = $0; sub(/.*ID=/, "", id); sub(/[^0-9].*/, "", id); inmode = (id == mode); param = ""; next
+    }
+    /^[ \t]*$/ { param = ""; next }
+    param != "" && NF >= 2 && $1 ~ /^(MAX|MIN)_FREQ(_KNEXT)?$/ { path[param, $1] = $2; next }
+    inmode && NF == 3 && $2 ~ /^(MAX|MIN)_FREQ$/ && $3 != "-1" { val[$1, $2] = $3; order[++n] = $1 SUBSEP $2 }
+    END {
+      for (i = 1; i <= n; i++) {
+        split(order[i], k, SUBSEP)
+        p = path[k[1], k[2]]; q = path[k[1], k[2] "_KNEXT"]
+        if (p == "" && q == "") continue
+        print k[1], k[2], val[k[1], k[2]], (p != "" ? p : q), (q != "" && q != p ? q : "")
+      }
+    }' "$conf"
+}
+
+_prima_limit_path() {  # first existing path of "PATH [ALT_PATH]"
+  local candidate
+  for candidate in "$@"; do
+    [[ -n "$candidate" ]] || continue
+    if [[ -e "$candidate" ]] || sudo -n test -e "$candidate" 2>/dev/null; then echo "$candidate"; return 0; fi
+  done
+  return 1
+}
+
+# Apply the limits of a power mode (MIN after MAX). Returns 1 if any failed.
+prima_apply_mode_limits() {
+  local name kind value path alt target failed=0
+  while read -r name kind value path alt; do
+    [[ "$kind" == MIN_FREQ && "$value" == 0 ]] && continue
+    if ! target="$(_prima_limit_path "$path" "$alt")"; then
+      echo "[WARN] ${name} ${kind}: no control file (${path})" >&2; continue
+    fi
+    if ! echo "$value" | sudo -n tee "$target" >/dev/null 2>&1; then
+      echo "[ERROR] could not write ${value} to ${target}" >&2; failed=1
+    fi
+  done < <(prima_mode_limits "${1:-}" | sort -k2,2 -s)
+  return "$failed"
+}
+
+# Print "clock_limit_<NAME>=<actual> (mode <expected>)" lines and return 1 if
+# any actual maximum is above the mode's limit.
+prima_check_mode_limits() {
+  local name kind value path alt target actual bad=0
+  while read -r name kind value path alt; do
+    [[ "$kind" == MAX_FREQ ]] || continue
+    if ! target="$(_prima_limit_path "$path" "$alt")"; then
+      echo "clock_limit_${name}=unreadable (mode ${value}; run 'sudo -v' first)"; bad=1; continue
+    fi
+    actual="$(cat "$target" 2>/dev/null || sudo -n cat "$target" 2>/dev/null)"
+    actual="$(echo "$actual" | tr -dc '0-9')"
+    echo "clock_limit_${name}=${actual:-unreadable} (mode ${value})"
+    if [[ -z "$actual" || "$actual" -gt "$value" ]]; then bad=1; fi
+  done < <(prima_mode_limits "${1:-}")
+  return "$bad"
+}
+
+# Used by the runners: record the actual limits and stop if they exceed the
+# power mode (set PRIMA_ALLOW_UNCAPPED=1 to run anyway).
+prima_require_mode_limits() {
+  local out rc=0
+  if ! command -v nvpmodel >/dev/null 2>&1 || [[ ! -r "${NVPMODEL_CONF:-/etc/nvpmodel.conf}" ]]; then
+    PRIMA_CLOCK_LIMITS="clock_limits=unchecked (no nvpmodel)"; export PRIMA_CLOCK_LIMITS; return 0
+  fi
+  out="$(prima_check_mode_limits)" || rc=$?
+  PRIMA_CLOCK_LIMITS="$(nvpmodel -q 2>/dev/null | head -1 | sed 's/^/power_mode_reported=/')"$'\n'"$out"
+  export PRIMA_CLOCK_LIMITS
+  echo "$out" | sed 's/^/[INFO] /'
+  if (( rc != 0 )); then
+    echo "[ERROR] clock limits are above the power mode or could not be read; run "sudo -v" and scripts/setup/apply_power_mode_limits.sh" >&2
+    [[ "${PRIMA_ALLOW_UNCAPPED:-0}" == 1 ]] || exit 1
+    echo "[WARN] PRIMA_ALLOW_UNCAPPED=1: continuing" >&2
+  fi
+}
+
 prima_tty_prepare() {
   if [[ -t 0 ]]; then
     stty opost onlcr 2>/dev/null || true
