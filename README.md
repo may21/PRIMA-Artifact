@@ -261,6 +261,22 @@ value checks (measured vs. paper, within the tolerances in the JSON file) and
 claim checks (the qualitative statements of Sections 3 and 5, such as
 "PRIMA-TS lowers the mean latency of every workload").
 
+### Predictor evaluation
+
+`scripts/analysis/evaluate_predictor.py` evaluates the memory predictor on
+`datasets/predictor_memory_features.csv` without leakage. The CSV holds
+1,547 measurements of 368 distinct configurations, so a random row split
+tests on configurations it trained on. The script reports the paper's four
+regressors and two simple baselines under a random split, a split grouped
+by configuration, and leave-one-model-out, plus task, scale and family
+hold-outs. It needs `scikit-learn`; `xgboost` and `lightgbm` are optional.
+
+```bash
+python3 scripts/analysis/evaluate_predictor.py --output-dir results/predictor_evaluation
+```
+
+The results of this run are kept in `docs/predictor_evaluation/`.
+
 ## 5. External assets
 
 Large or device-specific assets are excluded from GitHub and prepared with the

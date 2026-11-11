@@ -1,0 +1,19 @@
+family,model,task,runtime,parameters_M,rows,configurations,repeats_per_config,input_px,batch,precision,target_min_MB,target_max_MB
+non-YOLO,EfficientNet-B0,cls,trtexec,5.3,62,2,31-31,320,1,fp16/fp32,2262,2564
+non-YOLO,ResNet-50,cls,trtexec,25.5,62,2,31-31,320,1,fp16/fp32,2169,2503
+non-YOLO,ViT-B/16,cls,trtexec,86.6,62,2,31-31,320,1,fp16/fp32,1951,2401
+non-YOLO,RetinaNet-R50-FPN,det,PyTorch,34.1,62,2,31-31,320,1,fp16/fp32,2950,2985
+non-YOLO,Faster R-CNN-R50-FPN,det,PyTorch,41.8,62,2,31-31,320,1,fp16/fp32,2735,2854
+non-YOLO,Keypoint R-CNN-R50-FPN,pose,PyTorch,59.2,62,2,31-31,320,1,fp16/fp32,3387,3465
+non-YOLO,DeepLabV3-ResNet50,seg,trtexec,42.0,62,2,31-31,320,1,fp16/fp32,2301,2637
+non-YOLO,Mask R-CNN-R50-FPN,seg,PyTorch,44.5,62,2,31-31,320,1,fp16/fp32,3615,3626
+YOLOv8,yolov8n-cls,cls,TensorRT (Ultralytics),2.7,107,36,2-3,320/480/640,1/2/4/8,fp16/fp32/int8,512,984
+YOLOv8,yolov8s-cls,cls,TensorRT (Ultralytics),6.4,108,36,3-3,320/480/640,1/2/4/8,fp16/fp32/int8,519,980
+YOLOv8,yolov8n,det,TensorRT (Ultralytics),3.2,107,36,2-3,320/480/640,1/2/4/8,fp16/fp32/int8,678,832
+YOLOv8,yolov8s,det,TensorRT (Ultralytics),11.2,108,36,3-3,320/480/640,1/2/4/8,fp16/fp32/int8,700,828
+YOLOv8,yolov8n-obb,obb,TensorRT (Ultralytics),3.1,107,36,2-3,320/480/640,1/2/4/8,fp16/fp32/int8,1448,2214
+YOLOv8,yolov8s-obb,obb,TensorRT (Ultralytics),11.4,96,32,3-3,320/480/640,1/2/4/8,fp16/fp32/int8,1774,2197
+YOLOv8,yolov8n-pose,pose,TensorRT (Ultralytics),3.3,107,36,2-3,320/480/640,1/2/4/8,fp16/fp32/int8,678,849
+YOLOv8,yolov8s-pose,pose,TensorRT (Ultralytics),11.6,96,32,3-3,320/480/640,1/2/4/8,fp16/fp32/int8,701,837
+YOLOv8,yolov8n-seg,seg,TensorRT (Ultralytics),3.4,107,36,2-3,320/480/640,1/2/4/8,fp16/fp32/int8,763,2166
+YOLOv8,yolov8s-seg,seg,TensorRT (Ultralytics),11.8,108,36,3-3,320/480/640,1/2/4/8,fp16/fp32/int8,919,2330
