@@ -29,6 +29,7 @@ echo "mode,workload,repeat,container,exit_status,oom_killed,result_dir" > "$SUMM
   echo "repeat_range=${REPEAT_START}-${REPEAT_END}"
   echo "memory_limit=unlimited"
   echo "image=$IMAGE"
+  echo "container_network=$CONTAINER_NETWORK"
   echo "dataset_root=$DATASET_ROOT"
   echo "locale=$LC_ALL"
   echo "${PRIMA_CLOCK_LIMITS:-clock_limits=unchecked}"
@@ -76,6 +77,7 @@ CFG
       --name "$cname" \
       --runtime=nvidia \
       --ipc=host \
+      --network "$CONTAINER_NETWORK" \
       --user "$(id -u):$(id -g)" \
       --pull=never \
       -e CUDA_VISIBLE_DEVICES=0 \

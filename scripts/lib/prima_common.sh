@@ -28,6 +28,15 @@ fi
 : "${PRIMA_SSD_ROOT:=/home/orin1/ssd}"
 export PRIMA_ARTIFACT_ROOT PRIMA_SSD_ROOT
 
+# Docker network of the workload containers. The workloads need no network,
+# but Ultralytics looks up hosts (online check, plotting fonts) while it runs.
+# When DNS is slow, a container sleeps up to several seconds per lookup, which
+# stalls a workload in the middle of a measurement. "none" gives the containers
+# only a loopback interface, so these lookups fail at once. Set
+# CONTAINER_NETWORK=bridge to restore Docker's default.
+: "${CONTAINER_NETWORK:=none}"
+export CONTAINER_NETWORK
+
 if [[ ! -d "$PRIMA_ARTIFACT_ROOT" && -z "${PRIMA_QUIET_ROOT_CHECK:-}" ]]; then
   echo "[WARN] PRIMA_ARTIFACT_ROOT=${PRIMA_ARTIFACT_ROOT} does not exist on this machine." >&2
   echo "       Set it (or PRIMA_WORK_ROOT) in this shell, e.g. export PRIMA_ARTIFACT_ROOT=\$HOME/prima_test/prima_artifacts" >&2
