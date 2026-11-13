@@ -54,7 +54,6 @@ for workload in "${WORKLOADS[@]}"; do
     --name "$cname" \
     --runtime=nvidia \
     --ipc=host \
-    --network "$CONTAINER_NETWORK" \
     -e HOME=/tmp \
     -e YOLO_CONFIG_DIR=/tmp/ultralytics \
     -e START_AT_NS="$START_AT_NS" \
@@ -103,7 +102,6 @@ done
   echo "common_start_at_ns=${START_AT_NS}"
   echo "warmup_requests_per_workload=5"
   echo "save_results=false"
-  echo "container_network=$CONTAINER_NETWORK"
   echo "measurement=result.speed[inference]"
   echo "goodput_dataset_root=${GOODPUT_DATASET_ROOT}"
   echo "yolo_root=${YOLO}"

@@ -89,7 +89,6 @@ Path overrides, when a machine deviates from the layout:
 | `DATASET_ROOT` | the first of `prima_artifacts/paper_images`, `prima_artifacts/yolo_runtime`, `prima_artifacts/yolo/workload` that holds the images named in the installed image lists; runners stop if a listed image is missing | YOLO runners |
 | `YOLO_ROOT` | the first of `yolo_runtime`, `yolo/workload` that holds `yolov8n.engine` | goodput |
 | `GOODPUT_DATASET_ROOT` | `$PRIMA_SSD_ROOT/prima_goodput_5000` | goodput |
-| `CONTAINER_NETWORK` | `none`: workload containers get only a loopback interface, so Ultralytics host lookups (online check, plotting fonts) fail at once instead of stalling on slow DNS; `bridge` restores Docker's default | YOLO and goodput runners |
 | `CLIP_ROOT` | `$PRIMA_ARTIFACT_ROOT/clip` | CLIP |
 | `PERF_BIN` | the first `perf` that runs on this kernel | perf-based runners |
 

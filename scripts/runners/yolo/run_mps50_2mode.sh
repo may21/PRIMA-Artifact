@@ -220,7 +220,6 @@ echo "mode,repeat,workload,memory_limit,swap_max,container,exit_status,oom_kille
   echo "device=$(tr -d '\0' </proc/device-tree/model)"
   echo "jetson_release=$(head -1 /etc/nv_tegra_release)"
   echo "image=$IMAGE"
-  echo "container_network=$CONTAINER_NETWORK"
   echo "repeats=$REPEATS"
   echo "image_limit=$IMAGE_LIMIT"
   echo "requested_power_mode=${POWER_MODE_NAME:-unchanged}"
@@ -279,7 +278,6 @@ for mode in "${MODES[@]}"; do
         --name "$cname"
         --runtime=nvidia
         --ipc=host
-        --network "$CONTAINER_NETWORK"
         --user "$(id -u):$(id -g)"
         --pull=never
         -e CUDA_VISIBLE_DEVICES=0

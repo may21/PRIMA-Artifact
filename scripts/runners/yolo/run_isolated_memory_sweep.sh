@@ -129,7 +129,6 @@ fi
   echo "device=$(tr -d '\0' </proc/device-tree/model)"
   echo "jetson_release=$(head -1 /etc/nv_tegra_release)"
   echo "image=$IMAGE"
-  echo "container_network=$CONTAINER_NETWORK"
   echo "repeats=$REPEATS"
   echo "repeat_range=${REPEAT_START}-${REPEAT_END}"
   echo "image_limit=${IMAGE_LIMIT}"
@@ -174,7 +173,6 @@ for workload in "${WORKLOADS[@]}"; do
         --name "$cname" \
         --runtime=nvidia \
         --ipc=host \
-        --network "$CONTAINER_NETWORK" \
         --user "$(id -u):$(id -g)" \
         --memory="$memory_limit" \
         --memory-swap="$memory_limit" \
